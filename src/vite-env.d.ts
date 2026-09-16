@@ -714,6 +714,10 @@ declare global {
       restartNeteaseApi: () => Promise<ElectronNeteaseApiStatus>;
       onNeteaseApiStatusChanged: (callback: (status: ElectronNeteaseApiStatus) => void) => () => void;
       getKugouApiStatus: () => Promise<ElectronKugouApiStatus>;
+      getFanjiaoStatus: () => Promise<{ configured: boolean }>;
+      fanjiaoRequest: <T extends import('./types/fanjiao').FanjiaoOperation>(
+        operation: T, params?: Record<string, string | number | boolean | undefined>,
+      ) => Promise<import('./types/fanjiao').FanjiaoResponse<import('./types/fanjiao').FanjiaoResponses[T]>>;
       kugouRequest: (
         operation: ElectronKugouOperation,
         params?: Record<string, string | number | boolean | undefined>,

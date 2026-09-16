@@ -22,6 +22,8 @@ import { modeNeedsBeatGrid } from './automix/transitionStrategy';
 import { useLyricSettingsStore } from '../stores/useLyricSettingsStore';
 import { useAutomixSettingsStore } from '../stores/useAutomixSettingsStore';
 import { useAudioSettingsStore } from '../stores/useAudioSettingsStore';
+import { useEpisodePlaybackStore } from '../stores/useEpisodePlaybackStore';
+import { resolveQueueNeighborIndex } from '../utils/episodePlayback';
 
 // Prefetch configuration
 //
@@ -279,7 +281,8 @@ const prefetchSong = async (
   const settingsLyricSettings = useLyricSettingsStore.getState();
                 const autoUseBest = settingsLyricSettings.autoUseBestLyric;
                 const preferredSource = settingsLyricSettings.preferredAlternativeLyricSource;
-                const shouldAutoMatch = autoUseBest && !onlineLyricsState?.hasOnlineOverride;
+                const shouldAutoMatch = autoUseBest && !onlineLyricsState?.hasOnlineOverride
+                    && omni.getProviderCapabilities(sourceRef.providerId).alternativeLyrics !== false;
 
                 if (shouldAutoMatch) {
                     try {
@@ -427,7 +430,8 @@ export const prefetchNearbySongs = async (
     // are no longer either half of the next transition. This function is called on every track change
     // and every queue change, which is exactly when that set moves - and analysis is serial, so a
     // stale entry does not merely waste itself, it delays the track the listener just chose.
-    const nextSong = currentIndex >= 0 ? queue[currentIndex + 1] : undefined;
+    const mainOnly = useEpisodePlaybackStore.getState().mainOnly;
+    const nextSong = currentIndex >= 0 ? queue[resolveQueueNeighborIndex(queue, currentSong, 1, 'off', mainOnly)] : undefined;
     setAnalysisScope(nextSong ? [currentSong, nextSong] : [currentSong]);
 
     if (currentIndex === -1) {
@@ -446,19 +450,21 @@ export const prefetchNearbySongs = async (
     const songsToPrefetch: SongResult[] = [];
 
     // Next songs
+    let nextAnchor = currentSong;
     for (let i = 1; i <= PREFETCH_COUNT_NEXT; i++) {
-        const idx = currentIndex + i;
-        if (idx < queue.length) {
-            songsToPrefetch.push(queue[idx]);
-        }
+        const idx = resolveQueueNeighborIndex(queue, nextAnchor, 1, 'off', mainOnly);
+        if (idx < 0) break;
+        songsToPrefetch.push(queue[idx]);
+        nextAnchor = queue[idx];
     }
 
     // Previous songs
+    let prevAnchor = currentSong;
     for (let i = 1; i <= PREFETCH_COUNT_PREV; i++) {
-        const idx = currentIndex - i;
-        if (idx >= 0) {
-            songsToPrefetch.push(queue[idx]);
-        }
+        const idx = resolveQueueNeighborIndex(queue, prevAnchor, -1, 'off', mainOnly);
+        if (idx < 0) break;
+        songsToPrefetch.push(queue[idx]);
+        prevAnchor = queue[idx];
     }
 
     console.log(`[Prefetch] Will prefetch ${songsToPrefetch.length} songs near index ${currentIndex}`);

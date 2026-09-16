@@ -30,6 +30,8 @@ export type PlaybackSourceRef =
 
 export interface ProviderCapabilities {
     search: boolean;
+    albumSearch?: boolean;
+    alternativeLyrics?: boolean;
     playback: boolean;
     lyrics: boolean;
     auth: boolean;
@@ -205,6 +207,7 @@ export class OnlineProviderError extends Error {
 
 export interface OnlineSearchProvider {
     searchSongs(query: string, limit: number, offset: number): Promise<ProviderPage<UnifiedSong>>;
+    searchAlbums?(query: string, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
 }
 
 export interface OnlinePlaybackProvider {

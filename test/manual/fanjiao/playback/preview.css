@@ -1,0 +1,19 @@
+/* 单集验证页面使用系统颜色，保留原生音频控件和键盘焦点。 */
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; color: CanvasText; background: Canvas; }
+main { max-width: 840px; margin: 48px auto; padding: 0 24px 48px; }
+.eyebrow { opacity: .6; font-size: 12px; letter-spacing: .15em; }
+h1 { font-size: 28px; line-height: 1.4; margin: 16px 0; }
+audio { width: 100%; margin-top: 20px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button { font: inherit; padding: 8px 14px; cursor: pointer; }
+button:disabled { cursor: wait; }
+#clock, time, #stats { font-variant-numeric: tabular-nums; }
+#active-subtitle { min-height: 70px; margin: 28px 0; font-size: 23px; line-height: 1.6; }
+details { margin-top: 20px; }
+summary { cursor: pointer; }
+ol { padding-left: 24px; }
+li { padding: 8px; line-height: 1.6; border-left: 3px solid transparent; }
+li.active { border-color: Highlight; background: color-mix(in srgb, Highlight 15%, Canvas); }
+time { display: inline-block; min-width: 128px; opacity: .65; font-size: 12px; }
+pre { white-space: pre-wrap; font-size: 12px; }

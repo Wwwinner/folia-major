@@ -22,6 +22,7 @@ import { usePlaybackStore, type TransitionDisplay } from '../../stores/usePlayba
 import { useAudioSettingsStore } from '../../stores/useAudioSettingsStore';
 import { getPlaybackRepresentation } from '../playbackRecovery/representationRegistry';
 import { buildNavidromeSourceRevision } from '../playbackRecovery/sourceRevision';
+import { getLogicalAudioSource, isSegmentedAudioSource } from '../playbackMediaSource';
 
 export type { TransitionDisplay };
 
@@ -455,7 +456,7 @@ export function useAutomixDecks({
             deck,
             role: isActive ? 'active' : session.getPhase() === 'idle' ? 'warm' : 'tail',
             song: deckSongRef.current[deck],
-            source: element.currentSrc || element.getAttribute('src'),
+            source: getLogicalAudioSource(element),
         };
     }, [session]);
 
@@ -537,6 +538,8 @@ export function useAutomixDecks({
      */
     const checkTransitionPoint = useCallback((time: number) => {
         if (!currentSong || !audioSrc) return;
+        // 广播剧按集顺序完整播放；当前分片流不参与音乐混音或提前换轨。
+        if (isSegmentedAudioSource(audioSrc)) return;
         // Never silent: a blend is scheduled backwards from the end of the track, so without a
         // duration this function can only do nothing - and doing nothing is indistinguishable from
         // the planner deciding against a transition. That is exactly how a duration left at zero
@@ -588,6 +591,7 @@ export function useAutomixDecks({
         const nextWarmSrc = recoveredWarmSrc || (prefetched?.audioUrl && prefetched.audioUrl !== 'CACHED_IN_DB'
             ? prefetched.audioUrl
             : null);
+        if (isSegmentedAudioSource(nextWarmSrc)) return;
         const idleDeck = activeDeck === 'A' ? 'B' : 'A';
         deckSongRef.current[idleDeck] = nextWarmSrc ? nextSong : null;
         setWarmSrc(nextWarmSrc);
@@ -703,7 +707,7 @@ export function useAutomixDecks({
      * otherwise, which is what every build before stems did.
      */
     useEffect(() => {
-        if (!isEnabled || !currentSong || transition.mode !== 'automix') return;
+        if (!isEnabled || !currentSong || transition.mode !== 'automix' || isSegmentedAudioSource(audioSrc)) return;
         if (!canSeparateStems()) return;
 
         const next = resolveNextQueueSong(playQueue, currentSong, loopMode);
@@ -752,7 +756,7 @@ export function useAutomixDecks({
         });
         if (next) {
             const prefetched = getPrefetchedData(next, audioQuality);
-            void ensureStems({
+            if (!isSegmentedAudioSource(prefetched?.audioUrl)) void ensureStems({
                 song: next,
                 role: 'head',
                 audioUrl: prefetched?.audioUrl && prefetched.audioUrl !== 'CACHED_IN_DB'

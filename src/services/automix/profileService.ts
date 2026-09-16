@@ -1,6 +1,7 @@
 import type { SongResult } from '../../types';
 import { getPlaybackSongKey, getPlaybackSourceRef } from '../../utils/appPlaybackGuards';
 import { saveAudioBlob } from '../audioCache';
+import { isSegmentedAudioSource } from '../playbackMediaSource';
 import { getFromCache, saveToCache } from '../db';
 import { getCachedSongAudioBlob } from '../onlineMusic/resourceCache';
 import { getSongResourceCacheKey } from '../onlineMusic/resourceKeys';
@@ -214,6 +215,7 @@ const readBytes = async (
     /** A head-only profile is already stored, so there is nothing a second range request buys. */
     hasStoredPartial: boolean,
 ): Promise<BytesResult> => {
+    if (isSegmentedAudioSource(audioUrl)) return { skipped: 'segmented audio is not a complete media file' };
     const representation = getPlaybackRepresentation(song);
     if (representation) {
         try {

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X, Play, Plus } from 'lucide-react';
 import { List as VirtualList } from 'react-window';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ export interface SidePanelListProps<T> {
     items: T[];
     renderItem: (item: T, index: number, style: React.CSSProperties) => React.ReactNode;
     itemHeight: number;
+    columns?: 1 | 2;
     isDaylight: boolean;
     focusedIndex?: number;
     hideTitle?: boolean;
@@ -21,8 +22,17 @@ export interface SidePanelListProps<T> {
     headerActions?: React.ReactNode;
 }
 
-const RowComponent = ({ index, style, items, renderItem }: any): React.ReactElement => {
-    return <>{renderItem(items[index], index, style)}</>;
+const RowComponent = ({ index, style, items, renderItem, columns }: any): React.ReactElement => {
+    if (columns === 1) return <>{renderItem(items[index], index, style)}</>;
+    // 虚拟列表以行为单位，格子始终按原始项目索引取值，末行允许只有一项。
+    const start = index * columns;
+    return <div style={{ ...style, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        {items.slice(start, start + columns).map((item: unknown, offset: number) => (
+            <React.Fragment key={start + offset}>
+                {renderItem(item, start + offset, { height: '100%', minWidth: 0 })}
+            </React.Fragment>
+        ))}
+    </div>;
 };
 
 export function SidePanelList<T>({
@@ -32,6 +42,7 @@ export function SidePanelList<T>({
     items,
     renderItem,
     itemHeight,
+    columns = 1,
     isDaylight,
     focusedIndex,
     hideTitle = false,
@@ -39,21 +50,32 @@ export function SidePanelList<T>({
     headerActions,
 }: SidePanelListProps<T>) {
     const { t } = useTranslation();
+    const reducedMotion = useReducedMotion();
     const [listHeight, setListHeight] = useState(400);
+    const measuredHeightRef = useRef(400);
     const listContainerRef = useRef<HTMLDivElement>(null);
     const virtualListRef = useRef<any>(null);
     const bottomBarBottomPx = useSidePanelBottomPx();
+    const previousLayoutRef = useRef({ columns, itemHeight });
+    const scrollTopRef = useRef(0);
 
-    const rowProps = React.useMemo(() => ({ items, renderItem }), [items, renderItem]);
+    const rowProps = React.useMemo(() => ({ items, renderItem, columns }), [items, renderItem, columns]);
+    const rowCount = Math.ceil(items.length / columns);
+    const focusedRow = focusedIndex === undefined || rowCount === 0 ? undefined
+        : Math.max(0, Math.min(rowCount - 1, Math.floor(focusedIndex / columns)));
 
     // Measure list container height for react-window
     useEffect(() => {
         if (isOpen && listContainerRef.current) {
             const el = listContainerRef.current;
-            setListHeight(el.clientHeight);
-            const observer = new ResizeObserver(() => {
-                setListHeight(el.clientHeight);
-            });
+            const measureHeight = () => {
+                const height = el.clientHeight;
+                if (height === measuredHeightRef.current) return;
+                measuredHeightRef.current = height;
+                setListHeight(height);
+            };
+            measureHeight();
+            const observer = new ResizeObserver(measureHeight);
             observer.observe(el);
             return () => observer.disconnect();
         }
@@ -62,12 +84,31 @@ export function SidePanelList<T>({
     const lastScrollTargetRef = useRef<number | null>(null);
 
     // Scroll to focused index when opened or focused index changes
-    useEffect(() => {
-        if (isOpen && focusedIndex !== undefined && virtualListRef.current) {
+    useLayoutEffect(() => {
+        const previousLayout = previousLayoutRef.current;
+        previousLayoutRef.current = { columns, itemHeight };
+        if (isOpen && previousLayout.columns !== columns && virtualListRef.current?.element) {
+            // 改列数时先把首个可见分集映射到新行，避免宽度过渡中突然跳回旧焦点。
+            const list = virtualListRef.current;
+            const previousTop = scrollTopRef.current;
+            const firstItem = Math.floor(previousTop / previousLayout.itemHeight) * previousLayout.columns;
+            const rowFraction = (previousTop % previousLayout.itemHeight) / previousLayout.itemHeight;
+            list.element.scrollTop = (Math.floor(firstItem / columns) + rowFraction) * itemHeight;
+            if (focusedIndex !== undefined && focusedRow !== undefined) {
+                const previousFocusTop = Math.floor(focusedIndex / previousLayout.columns) * previousLayout.itemHeight;
+                if (previousFocusTop >= previousTop && previousFocusTop + previousLayout.itemHeight <= previousTop + listHeight) {
+                    list.scrollToRow({ index: focusedRow, align: 'smart', behavior: 'auto' });
+                }
+            }
+            scrollTopRef.current = list.element.scrollTop;
+            return;
+        }
+        if (isOpen && focusedRow !== undefined && virtualListRef.current) {
             // Use a small timeout to ensure the list has rendered first
                 const isInitialOpen = lastScrollTargetRef.current === null;
                 const delay = isInitialOpen ? 50 : 350; // Debounce subsequent scroll updates
                 
+                let settleTimer: ReturnType<typeof setTimeout> | undefined;
                 const timer = setTimeout(() => {
                     const list = virtualListRef.current;
                     if (!list) return;
@@ -75,35 +116,38 @@ export function SidePanelList<T>({
                     // If opening panel for the first time
                     if (isInitialOpen) {
                         // Start from nearby (e.g. 8 items above) to create a short smooth scroll effect
-                        const jumpIndex = Math.max(0, focusedIndex - 8);
+                        const jumpIndex = Math.max(0, focusedRow - 8);
                         list.scrollToRow({ index: jumpIndex, align: 'start', behavior: 'auto' });
                         
-                        setTimeout(() => {
-                            list.scrollToRow({ index: focusedIndex, align: 'center', behavior: 'smooth' });
+                        settleTimer = setTimeout(() => {
+                            list.scrollToRow({ index: focusedRow, align: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
                         }, 50);
                     } else {
                         // If already open, just smoothly scroll to the target directly
-                        list.scrollToRow({ index: focusedIndex, align: 'center', behavior: 'smooth' });
+                        list.scrollToRow({ index: focusedRow, align: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
                     }
                     
-                    lastScrollTargetRef.current = focusedIndex;
+                    lastScrollTargetRef.current = focusedRow;
                 }, delay);
-                return () => clearTimeout(timer);
+                return () => { clearTimeout(timer); clearTimeout(settleTimer); };
             } else if (!isOpen) {
                 lastScrollTargetRef.current = null;
             }
-    }, [isOpen, focusedIndex]);
+    }, [isOpen, focusedIndex, focusedRow, columns, itemHeight, listHeight, reducedMotion]);
 
     return (
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    initial={{ opacity: 0, x: 60, scale: 0.95 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: 60, scale: 0.95 }}
-                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, x: reducedMotion ? 0 : 60, scale: reducedMotion ? 1 : 0.95,
+                        width: columns === 2 ? '30rem' : '20rem' }}
+                    animate={{ opacity: 1, x: 0, scale: 1, width: columns === 2 ? '30rem' : '20rem' }}
+                    exit={{ opacity: 0, x: reducedMotion ? 0 : 60, scale: reducedMotion ? 1 : 0.95 }}
+                    transition={{ duration: reducedMotion ? 0.12 : 0.35, ease: [0.16, 1, 0.3, 1],
+                        width: { duration: reducedMotion ? 0 : 0.32, ease: [0.22, 1, 0.36, 1] } }}
                     data-testid="side-panel-list"
-                    className="absolute right-6 top-24 w-80 max-w-[calc(100vw-3rem)] rounded-3xl z-[80] flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel"
+                    data-columns={columns}
+                    className="absolute right-6 top-24 max-w-[calc(100vw-3rem)] rounded-3xl z-[80] flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel"
                     style={{
                         bottom: bottomBarBottomPx,
                         boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
@@ -141,10 +185,11 @@ export function SidePanelList<T>({
                             <VirtualList
                                 listRef={virtualListRef}
                                 style={{ height: listHeight, width: '100%' }}
-                                rowCount={items.length}
+                                rowCount={rowCount}
                                 rowHeight={itemHeight}
                                 rowProps={rowProps}
                                 rowComponent={RowComponent}
+                                onScroll={event => { scrollTopRef.current = event.currentTarget.scrollTop; }}
                                 className="overflow-x-hidden custom-scrollbar"
                             />
                         )}

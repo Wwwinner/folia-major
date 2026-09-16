@@ -89,12 +89,12 @@ export const omni = {
                 displayName: provider.displayName,
                 shortName: provider.shortName || provider.displayName,
                 availability: provider.getAvailability?.() ?? { configured: true },
-                status: account?.status || 'unknown',
+                status: provider.capabilities.auth ? account?.status || 'unknown' : 'anonymous',
                 user: account?.user || null,
                 collections: account?.collections || [],
                 error: account?.error,
-                hydration: account?.hydration || 'loading',
-                freshness: account?.freshness || 'stale',
+                hydration: provider.capabilities.auth ? account?.hydration || 'loading' : 'ready',
+                freshness: provider.capabilities.auth ? account?.freshness || 'stale' : 'fresh',
                 lastUpdatedAt: account?.lastUpdatedAt,
             };
         });
@@ -160,6 +160,19 @@ export const omni = {
         const provider = requireOnlineMusicProvider(providerId);
         if (!providerSupports(provider, 'search') || !provider.search) return emptyPage(page.offset);
         return provider.search.searchSongs(query, page.limit, page.offset);
+    },
+
+    async searchAlbums(query: string, page: PageInput): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(async provider => {
+            if (!provider.capabilities.albumSearch || !provider.search?.searchAlbums) return emptyPage(page.offset);
+            return provider.search.searchAlbums(query, page.limit, page.offset);
+        });
+    },
+
+    async searchProviderAlbums(providerId: OmniProviderId, query: string, page: PageInput): Promise<OmniPage<OmniCollection>> {
+        const provider = requireOnlineMusicProvider(providerId);
+        if (!provider.capabilities.albumSearch || !provider.search?.searchAlbums) return emptyPage(page.offset);
+        return provider.search.searchAlbums(query, page.limit, page.offset);
     },
 
     async getLoginStatus(providerId: OmniProviderId): Promise<OmniUser | null> {

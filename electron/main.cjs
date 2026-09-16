@@ -35,6 +35,7 @@ const { createModelStore } = require('./analysis/modelStore.cjs');
 const { resolveLinuxPasswordStore } = require('./linuxPasswordStore.cjs');
 const { createTranscodeService } = require('./transcode/service.cjs');
 const { TRANSCODE_PROTOCOL_SCHEME } = require('./transcode/protocol.cjs');
+const { createFanjiaoBridge, FANJIAO_SCHEME, isTrustedFanjiaoPage } = require('./fanjiao/bridge.cjs');
 const { sanitizeDualTheme: sanitizeGeneratedDualTheme } = require('../shared/themeSanitizer.cjs');
 const {
   buildOpenAICompatibleRequestBody,
@@ -89,6 +90,7 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
+  { scheme: FANJIAO_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
   MOD_PROTOCOL_PRIVILEGED_SCHEME,
 ]);
 
@@ -186,6 +188,7 @@ const transcodeService = createTranscodeService({
 // The bridge refuses Linux's plaintext `basic_text` fallback and degrades to an in-memory session.
 const kugouApiBridge = createKugouApiBridge({ store, safeStorage });
 const qqAuthSessionRepository = createQqAuthSessionRepository({ store, safeStorage });
+const fanjiaoBridge = createFanjiaoBridge({ app });
 
 // --- Desktop wallpaper mode (Wayland layer-shell via windowtolayer / X11 desktop window) ---
 // Settings keys follow the existing electron-store key/value chain; values are normalized here in
@@ -5221,6 +5224,7 @@ app.whenReady().then(async () => {
   setupFileSystemAccessPermissionHandlers();
   setupCorsBypassHandlers();
   localCoverAssetStore.registerProtocolHandler(protocol, electronNet);
+  protocol.handle(FANJIAO_SCHEME, request => fanjiaoBridge.handleProtocol(request));
   // Transcode fallback is an optional degradation path; a failure preparing it must never keep
   // the rest of this handler, createWindow() included, from running.
   try {
@@ -5442,6 +5446,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  fanjiaoBridge.dispose();
   transcodeService.dispose();
   isAppQuitting = true;
   clearPendingWindowPlaybackHandoffRequests();
@@ -5973,6 +5978,16 @@ ipcMain.handle('get-qq-port', () => qqApiStatus.port);
 ipcMain.handle('get-qq-api-status', () => qqApiStatus);
 
 ipcMain.handle('kugou-api-status', () => kugouApiBridge.getStatus());
+ipcMain.handle('fanjiao-status', (event) => {
+  if (!isTrustedMainWindowContents(event.sender) || event.senderFrame !== event.sender.mainFrame
+      || !isTrustedFanjiaoPage(event.senderFrame.url, app.getAppPath(), isElectronDevRuntime())) throw new Error('Untrusted Fanjiao caller');
+  return fanjiaoBridge.status();
+});
+ipcMain.handle('fanjiao-request', (event, operation, params) => {
+  if (!isTrustedMainWindowContents(event.sender) || event.senderFrame !== event.sender.mainFrame
+      || !isTrustedFanjiaoPage(event.senderFrame.url, app.getAppPath(), isElectronDevRuntime())) throw new Error('Untrusted Fanjiao caller');
+  return fanjiaoBridge.request(operation, params);
+});
 ipcMain.handle('kugou-api-request', (_event, operation, params) => kugouApiBridge.request(operation, params));
 
 ipcMain.handle('window-minimize', () => {

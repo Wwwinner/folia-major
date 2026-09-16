@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getNavidromeConfig, navidromeApi } from '../services/navidromeService';
 import type { HomeViewTab, LocalSong, SongResult, UnifiedSong } from '../types';
-import type { OnlineProviderId } from '../types/onlineMusic';
+import type { OnlineProviderId, ProviderCollection } from '../types/onlineMusic';
 import {
     applyLocalLibraryEntityDisplay,
     buildUnifiedLocalSong,
@@ -23,12 +23,14 @@ type SearchExecutorDeps = {
 
 type SearchExecutionResult = {
     results: UnifiedSong[];
+    albums?: ProviderCollection[];
     hasMore: boolean;
     nextOffset: number;
 };
 
 type SearchCacheEntry = {
     results: UnifiedSong[];
+    albums?: ProviderCollection[];
     offset: number;
     hasMore: boolean;
     scrollTop: number;
@@ -39,6 +41,7 @@ interface SearchNavigationState {
     searchQuery: string;
     searchSourceTab: SearchSource;
     searchResults: UnifiedSong[] | null;
+    searchAlbums: ProviderCollection[] | null;
     searchReturnView: SearchReturnView;
     isSearchOpen: boolean;
     isSearching: boolean;
@@ -143,6 +146,10 @@ const searchOnlineProviderSongs = async (
     limit: number,
     offset: number,
 ): Promise<SearchExecutionResult> => {
+    if (omni.getProviderCapabilities(providerId).albumSearch) {
+        const page = await omni.searchProviderAlbums(providerId, query, { limit, offset });
+        return { results: [], albums: page.items, hasMore: page.hasMore, nextOffset: page.nextOffset };
+    }
     const page = await omni.searchProviderSongs(providerId, query, { limit, offset });
     return { results: page.items, hasMore: page.hasMore, nextOffset: page.nextOffset };
 };
@@ -180,6 +187,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
     searchQuery: '',
     searchSourceTab: 'netease',
     searchResults: null,
+    searchAlbums: null,
     searchReturnView: 'home',
     isSearchOpen: false,
     isSearching: false,
@@ -218,6 +226,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
             searchSourceTab: sourceTab,
             searchReturnView: returnView,
             searchResults: cached?.results ?? null,
+            searchAlbums: cached?.albums ?? null,
             offset: cached?.offset ?? 0,
             hasMore: cached?.hasMore ?? false,
             scrollTop: cached?.scrollTop ?? 0,
@@ -232,6 +241,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
         searchQuery: '',
         searchSourceTab: onlineProviderId ?? state.searchSourceTab,
         searchResults: null,
+        searchAlbums: null,
         searchReturnView: 'home',
         isSearchOpen: false,
         isSearching: false,
@@ -259,6 +269,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
             searchError: null,
             requestId,
             searchResults: null,
+            searchAlbums: null,
             offset: 0,
             hasMore: false,
             scrollTop: 0,
@@ -271,6 +282,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
             }
             set(state => ({
                 searchResults: result.results,
+                searchAlbums: result.albums ?? null,
                 hasMore: result.hasMore,
                 offset: result.nextOffset,
                 isSearching: false,
@@ -278,6 +290,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
                     ...state.searchCache,
                     [getSearchCacheKey(trimmedQuery, sourceTab)]: {
                         results: result.results,
+                        albums: result.albums,
                         hasMore: result.hasMore,
                         offset: result.nextOffset,
                         scrollTop: 0,
@@ -292,6 +305,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
             }
             set({
                 searchResults: [],
+                searchAlbums: null,
                 hasMore: false,
                 offset: 0,
                 isSearching: false,
@@ -333,8 +347,10 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
             }
             set(state => {
                 const results = [...(searchResults || []), ...result.results];
+                const albums = result.albums ? [...(state.searchAlbums || []), ...result.albums] : undefined;
                 return {
                     searchResults: results,
+                    searchAlbums: albums ?? null,
                     hasMore: result.hasMore,
                     offset: result.nextOffset,
                     isLoadingMore: false,
@@ -342,6 +358,7 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
                         ...state.searchCache,
                         [getSearchCacheKey(searchQuery, searchSourceTab)]: {
                             results,
+                            albums,
                             hasMore: result.hasMore,
                             offset: result.nextOffset,
                             scrollTop: state.scrollTop,

@@ -6,6 +6,8 @@ import { volumeCommand } from './volumeCommand';
 import { fmModeCommand } from './fmModeCommand';
 import type { CommandPaletteCommand } from '../types';
 import { createToggleCommand, createReplayGainCommand, createSoundPresetCommand } from '../commandFactories';
+import { getEpisodeKey } from '../../../utils/episodePlayback';
+import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore';
 
 // src/components/command-palette/commands/playbackCommands.ts
 // Commands in the `playback` group: transport, queue, volume, Personal FM mode, ReplayGain, and
@@ -16,6 +18,18 @@ export const playbackCommands: CommandPaletteCommand[] = [
     queueCommand,
     volumeCommand,
     fmModeCommand,
+    createToggleCommand('playback-main-episodes', 'playback', 'Toggle main episode navigation',
+        'Skip extras during previous, next and automatic advance without changing the queue',
+        ['main episodes', 'audio drama', '正片', '只播正片', 'zbp', 'zjp'],
+        () => useEpisodePlaybackStore.getState().toggleMainOnly(),
+        { icon: SkipForward, isAvailable: context => Boolean(context && getEpisodeKey(context.shared.currentSong)) }),
+    createToggleCommand('playback-restart-episode', 'playback', 'Restart this episode',
+        'Play the current episode from the beginning', ['restart episode', '从头播放', '重听'], context => {
+            const song = context.shared.currentSong;
+            if (!song || !getEpisodeKey(song)) return;
+            useEpisodePlaybackStore.getState().restartEpisode(song);
+            void context.playback.playSong(song, context.playback.queue);
+        }, { icon: SkipBack, isAvailable: context => Boolean(context && getEpisodeKey(context.shared.currentSong)) }),
     createReplayGainCommand('off', 'Disable ReplayGain', 'Play audio without ReplayGain adjustment', ['replaygain off', 'audio gain off', '关闭音频增益', '关闭 replaygain', 'gbyyzy']),
     createReplayGainCommand('track', 'ReplayGain: Track mode', 'Apply per-track ReplayGain adjustment', ['replaygain track', 'track gain', 'single track gain', '单曲增益', '单曲 replaygain']),
     createReplayGainCommand('album', 'ReplayGain: Album mode', 'Apply album ReplayGain adjustment', ['replaygain album', 'album gain', '专辑增益', '专辑 replaygain']),

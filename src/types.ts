@@ -1117,6 +1117,8 @@ export interface SongResult {
   album: Album;
   durationMs: number;
   isPureMusic?: boolean;
+  /** Provider-normalized episodic content; main includes provider-designated mini episodes. */
+  episode?: { kind: 'main' | 'extra' | 'unknown'; playCount?: number };
   aliases?: string[];
   translatedNames?: string[];
   t?: 0 | 1 | 2;

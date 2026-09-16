@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- 饭角单集播放器验证页，独立于正式 Folia 界面。 -->
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>饭角单集播放验证</title><link rel="stylesheet" href="/preview.css"></head>
+<body><main>
+  <p class="eyebrow">FOLIA · 饭角单集验证</p>
+  <h1 id="title">正在获取播放信息…</h1>
+  <p id="details"></p>
+  <audio id="audio" controls preload="metadata"></audio>
+  <p id="status" role="status">准备中</p>
+  <div class="actions">
+    <button id="play" disabled>播放</button>
+    <button id="pause" disabled>暂停</button>
+    <button id="seek" disabled>跳到 30 秒</button>
+    <button id="refresh" disabled>验证地址刷新</button>
+  </div>
+  <p id="clock">0.00 / 0.00 秒</p>
+  <div id="active-subtitle" aria-live="off">字幕将在播放时显示</div>
+  <details open><summary>字幕时间轴</summary><ol id="subtitles"></ol></details>
+  <details><summary>验证状态</summary><pre id="stats"></pre></details>
+</main><script src="/hls.min.js"></script><script type="module" src="/preview.mjs"></script></body>
+</html>

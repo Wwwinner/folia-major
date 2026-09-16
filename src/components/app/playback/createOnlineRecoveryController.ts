@@ -11,6 +11,7 @@ import {
     replacePlaybackSongInQueue,
 } from '../../../utils/appPlaybackGuards';
 import { setAudioSrc, setCurrentSong, setPlayQueue } from '../../../stores/usePlaybackStore';
+import { getLogicalAudioSource } from '../../../services/playbackMediaSource';
 
 // src/components/app/playback/createOnlineRecoveryController.ts
 
@@ -43,6 +44,7 @@ export const getOnlineRecoveryKey = (src: string | null | undefined): string | n
 
     try {
         const parsedUrl = new URL(src);
+        if (parsedUrl.protocol === 'folia-hls:') return `folia-hls://${parsedUrl.hostname}/${parsedUrl.pathname.split('/')[1]}`;
         // Only remote streams carry a token in the query; blob: and friends have no meaningful origin.
         if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
             return src;
@@ -104,7 +106,7 @@ export const createOnlineRecoveryController = ({
             return false;
         }
 
-        const normalizedFailedSrc = getOnlineRecoveryKey(failedSrc || audioElement.currentSrc || audioSrc || null);
+        const normalizedFailedSrc = getOnlineRecoveryKey(failedSrc || getLogicalAudioSource(audioElement) || audioSrc || null);
         if (normalizedFailedSrc && lastAudioRecoverySourceRef.current === normalizedFailedSrc) {
             return false;
         }

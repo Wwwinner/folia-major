@@ -56,6 +56,13 @@ describe('cachePlayedTrackAssets', () => {
         expect(saveToCache).toHaveBeenCalledTimes(1);
     });
 
+    it('never stores an HLS manifest as a complete audio file', async () => {
+        const written = await cachePlayedTrackAssets(onlineSong, 'folia-hls://fanjiao/1/session/index.m3u8');
+        expect(written).toEqual({ audio: false, cover: true });
+        expect(saveAudioBlob).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
     // The P15 case: the cover was pruned while the audio survived, and the cover has to come back
     // without waiting for the audio to go missing too.
     it('refills a missing cover while the audio is still cached', async () => {

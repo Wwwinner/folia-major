@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { currentTime, lyricCurrentTime } from '../../../stores/motionSignals';
 import { useAppViewStore } from '../../../stores/useAppViewStore';
+import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore';
 import { useAppChromeStore } from '../../../stores/useAppChromeStore';
 import { useSearchNavigationStore } from '../../../stores/useSearchNavigationStore';
 import { useThemeSettingsStore } from '../../../stores/useThemeSettingsStore';
@@ -32,6 +33,7 @@ const MEMORY_MONITOR_SHORTCUT_LABEL = 'Alt+Shift+M';
  */
 export const useAppOverlaysModel = (deps: AppOverlaysDeps): AppOverlaysModel => {
     const { t } = useTranslation();
+    const mainEpisodesOnly = useEpisodePlaybackStore(state => state.mainOnly);
     const currentView = useAppViewStore(state => state.view);
     const isPlayerChromeHidden = useAppChromeStore(state => state.isPlayerChromeHidden);
     const isDevDebugOverlayVisible = useAppChromeStore(state => state.isDevDebugOverlayVisible);
@@ -80,6 +82,7 @@ export const useAppOverlaysModel = (deps: AppOverlaysDeps): AppOverlaysModel => 
     ]);
 
     return useMemo(() => buildAppOverlaysModel({
+        mainEpisodesOnly,
         ...deps,
         currentView,
         isSearchOpen,
@@ -117,6 +120,7 @@ export const useAppOverlaysModel = (deps: AppOverlaysDeps): AppOverlaysModel => 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [
         ...Object.values(deps),
+        mainEpisodesOnly,
         currentView,
         isSearchOpen,
         isDaylight,

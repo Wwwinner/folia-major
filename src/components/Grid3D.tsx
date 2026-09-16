@@ -177,6 +177,10 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     const activeProviderId = onlineProviderPlatform?.activeProviderId || 'netease';
     const activeProviderSummary = onlineProviderPlatform?.activeProvider;
     const activeProviderCapabilities = omni.getProviderCapabilities(activeProviderId);
+    const isPublicCatalog = !activeProviderCapabilities.auth && !!activeProviderCapabilities.albumSearch;
+    useEffect(() => {
+        if (isPublicCatalog && isOnlineTab && homeViewTab !== 'albums') setHomeViewTab('albums');
+    }, [homeViewTab, isOnlineTab, isPublicCatalog, setHomeViewTab]);
     // The FM card doubles as the mode readout: the card is the only place the current mode shows
     // up outside the player, and the picker can change it while this grid stays mounted.
     const personalFmSelection = usePersonalFmModeStore(state => state.selection);
@@ -187,7 +191,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         || activeProviderSummary?.displayName
         || omni.getProviderLabel(activeProviderId);
     const canUseOnlinePlaylists = activeProviderCapabilities.userLibrary && activeProviderCapabilities.playlists;
-    const canUseOnlineAlbums = activeProviderCapabilities.userLibrary && Boolean(activeProviderCapabilities.userAlbums);
+    const canUseOnlineAlbums = isPublicCatalog || (activeProviderCapabilities.userLibrary && Boolean(activeProviderCapabilities.userAlbums));
     const canUseOnlineRadio = activeProviderCapabilities.recommendations;
     const playlistUnavailableReason = canUseOnlinePlaylists
         ? undefined
@@ -834,7 +838,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             )}
                             <input
                                 type="text"
-                                placeholder={homeViewTab === 'local' ? t('home.searchLocal') : homeViewTab === 'navidrome' ? t('home.searchNavidrome') : t('home.searchDatabase')}
+                                placeholder={homeViewTab === 'local' ? t('home.searchLocal') : homeViewTab === 'navidrome' ? t('home.searchNavidrome') : t(isPublicCatalog ? 'home.searchAudioDrama' : 'home.searchDatabase')}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className={`w-full ${inputBg} border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-white/20 transition-all placeholder:text-current placeholder:opacity-40 select-text`}
@@ -851,6 +855,12 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     <div className="flex flex-1 w-full items-center justify-center" aria-busy="true">
                         <Loader2 className="animate-spin opacity-30" size={28} />
                     </div>
+                ) : isOnlineTab && isPublicCatalog ? (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                        <Search size={32} className="opacity-30" />
+                        <h2 className="text-xl font-semibold">{t('home.publicCatalogTitle', { provider: activeProviderLabel })}</h2>
+                        <p className="max-w-md text-sm leading-6 opacity-55">{t('home.publicCatalogPrompt')}</p>
+                    </div>
                 ) : isOnlineTab && activeAccountView === 'guest' ? (
                     <OnlineProviderConnectPanel
                         providers={onlineProviderPlatform?.providers || omni.getProviderSummaries()}
@@ -861,11 +871,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                 provider: activeProviderSummary?.shortName || activeProviderSummary?.displayName || activeProviderId,
                             })
                             : t('home.guestPrompt')}
-                        getActionLabel={provider => provider.status === 'authenticated'
+                        getActionLabel={provider => provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth
                             ? t('home.switchToProvider', { provider: provider.shortName || provider.displayName })
                             : t('home.connectProviderAccount', { provider: provider.shortName || provider.displayName })}
                         onSelect={provider => {
-                            if (provider.status === 'authenticated') {
+                            if (provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth) {
                                 void onlineProviderPlatform?.switchProvider(provider.providerId);
                             } else {
                                 void initLogin(provider.providerId);
@@ -1002,7 +1012,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     isDaylight={isDaylight}
                     onBackToPlayer={onBackToPlayer}
                     onSelect={provider => {
-                        if (provider.status === 'authenticated') {
+                        if (provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth) {
                             void onlineProviderPlatform.switchProvider(provider.providerId);
                         } else {
                             void initLogin(provider.providerId);

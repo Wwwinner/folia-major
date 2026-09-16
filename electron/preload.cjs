@@ -133,6 +133,8 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('netease-api-status-changed', listener);
     },
     getKugouApiStatus: () => ipcRenderer.invoke('kugou-api-status'),
+    getFanjiaoStatus: () => ipcRenderer.invoke('fanjiao-status'),
+    fanjiaoRequest: (operation, params) => ipcRenderer.invoke('fanjiao-request', operation, params),
     kugouRequest: (operation, params) => ipcRenderer.invoke('kugou-api-request', operation, params),
     getQqPort: () => ipcRenderer.invoke('get-qq-port'),
     getQqApiStatus: () => ipcRenderer.invoke('get-qq-api-status'),

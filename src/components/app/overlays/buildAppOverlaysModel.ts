@@ -36,6 +36,7 @@ export type AppOverlaysModel = {
 // signals, and its own translated labels. Keeping these out of the caller's argument list is the
 // whole point of useAppOverlaysModel below - App.tsx had to name all 25 of them.
 type AppOverlaysAmbient = {
+    mainEpisodesOnly?: boolean;
 
     currentView: FloatingControlsProps['currentView'];
     isSearchOpen: boolean;
@@ -87,6 +88,7 @@ export type AppOverlaysDeps = {
     handleSearchResultAddToQueue: (track: UnifiedSong) => void;
     handleSearchResultArtistOpen: SearchOverlayProps['onOpenArtist'];
     handleSearchResultAlbumOpen: SearchOverlayProps['onOpenAlbum'];
+    handleSearchCollectionOpen: SearchOverlayProps['onOpenCollection'];
     devDebugSnapshot: any;
     effectiveLoopMode: 'off' | 'all' | 'one';
     canToggleCurrentPlayback: boolean;
@@ -123,6 +125,7 @@ type BuildAppOverlaysModelParams = AppOverlaysAmbient & AppOverlaysDeps;
 
 // Builds the full overlay model, including detail overlays and floating playback controls.
 export const buildAppOverlaysModel = ({
+    mainEpisodesOnly = false,
     currentView,
     isSearchOpen,
     theme,
@@ -134,6 +137,7 @@ export const buildAppOverlaysModel = ({
     handleSearchResultAddToQueue,
     handleSearchResultArtistOpen,
     handleSearchResultAlbumOpen,
+    handleSearchCollectionOpen,
     isDevDebugOverlayVisible,
     isMemoryMonitorVisible,
     memoryMonitorShortcutLabel,
@@ -223,6 +227,7 @@ export const buildAppOverlaysModel = ({
             onAddTrackToQueue: handleSearchResultAddToQueue,
             onOpenArtist: handleSearchResultArtistOpen,
             onOpenAlbum: handleSearchResultAlbumOpen,
+            onOpenCollection: handleSearchCollectionOpen,
         }
         : null,
     // Not gated on the view, and that was a real hole: the app cold-starts on the home page,
@@ -294,6 +299,7 @@ export const buildAppOverlaysModel = ({
             onCommitBottomBarOffset: onCommitPlayerBottomBarOffset,
             trackNavigation: ((): FloatingControlsProps['trackNavigation'] => {
                 const neighbors = resolvePlaybackNeighbors({
+                    mainEpisodesOnly,
                     playQueue,
                     currentSong,
                     loopMode: effectiveLoopMode,

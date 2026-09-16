@@ -6,6 +6,7 @@ import type { CommandPalettePlaybackContext } from '../../command-palette/types'
 import type { PlayerControlSlotContext } from '../../floating-player/playerControlSlotActions';
 import { resolveLikeAvailability } from '../../../utils/playerLikeAvailability';
 import { resolvePlaybackNeighbors } from '../../../utils/playbackNeighbors';
+import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore';
 
 // src/components/app/lattice/LatticePlaybackProvider.tsx
 // Reuses the main bar's playback actions and keeps its timeline outside transformed cards.
@@ -39,8 +40,9 @@ type Props = {
 
 export default function LatticePlaybackProvider({ actions, currentSong, queue, lyrics, currentTime, duration, onSeek, isDaylight, children }: Props) {
     const [timelineOpen, setTimelineOpen] = useState(false);
+    const mainEpisodesOnly = useEpisodePlaybackStore(state => state.mainOnly);
     const context = useMemo<PlayerControlSlotContext>(() => {
-        const neighbors = resolvePlaybackNeighbors({ playQueue: queue, currentSong, loopMode: actions.loopMode,
+        const neighbors = resolvePlaybackNeighbors({ mainEpisodesOnly, playQueue: queue, currentSong, loopMode: actions.loopMode,
             isFmMode: actions.playback.isFmMode, isStageActive: Boolean(actions.isStageActive) });
         return {
             loopMode: actions.loopMode,
@@ -59,7 +61,7 @@ export default function LatticePlaybackProvider({ actions, currentSong, queue, l
             invokeCommandById: actions.invokeCommandById,
             canInvokeCommandById: actions.canInvokeCommandById,
         };
-    }, [actions, currentSong, lyrics, queue]);
+    }, [actions, currentSong, lyrics, queue, mainEpisodesOnly]);
     return <PlaybackContext.Provider value={context}>
         {children}
         {timelineOpen && createPortal(<Suspense fallback={null}>

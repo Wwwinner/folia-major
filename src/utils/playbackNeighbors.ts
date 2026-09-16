@@ -1,6 +1,7 @@
 import { getPlaybackSongKey } from './appPlaybackGuards';
 import { resolvePlaybackSongArtist, resolvePlaybackSongCoverUrl } from './playbackSongMeta';
 import type { SongResult } from '../types';
+import { resolveQueueNeighborIndex } from './episodePlayback';
 // src/utils/playbackNeighbors.ts
 
 export type PlaybackNeighbor = {
@@ -36,6 +37,7 @@ type ResolvePlaybackNeighborsParams = {
      * 只有需要预读下一首的遥控窗口用得上；浮动播放条只读 canGo 与 title，默认不付这份开销。
      */
     withMetadata?: boolean;
+    mainEpisodesOnly?: boolean;
 };
 
 /**
@@ -50,6 +52,7 @@ export const resolvePlaybackNeighbors = ({
     isFmMode,
     isStageActive,
     withMetadata = false,
+    mainEpisodesOnly = false,
 }: ResolvePlaybackNeighborsParams): PlaybackNeighbors => {
     // 舞台播放时两个 handler 都会直接 return，这里必须同步禁用，否则箭头点了没反应
     if (isStageActive || !currentSong || playQueue.length === 0) {
@@ -71,21 +74,8 @@ export const resolvePlaybackNeighbors = ({
         };
     };
 
-    let prevIndex = -1;
-    if (currentIndex > 0) {
-        prevIndex = currentIndex - 1;
-    } else if (loopMode === 'all') {
-        prevIndex = lastIndex;
-    }
-
-    let nextIndex = -1;
-    if (currentIndex >= 0 && currentIndex < lastIndex) {
-        nextIndex = currentIndex + 1;
-    } else if (currentIndex < 0) {
-        nextIndex = 0;
-    } else if (loopMode === 'all') {
-        nextIndex = 0;
-    }
+    const prevIndex = resolveQueueNeighborIndex(playQueue, currentSong, -1, loopMode, mainEpisodesOnly);
+    const nextIndex = resolveQueueNeighborIndex(playQueue, currentSong, 1, loopMode, mainEpisodesOnly);
 
     // FM 走到队列末尾时会追加新曲目再跳，标题此刻无法预知
     const fmWillFetch = isFmMode && currentIndex === lastIndex;

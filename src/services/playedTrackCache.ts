@@ -5,6 +5,7 @@ import { hasCachedSongAudio, hasCachedSongCover } from './onlineMusic/resourceCa
 import { getSongResourceCacheKey } from './onlineMusic/resourceKeys';
 import { getProviderSongMetadata } from './onlineMusic/songMetadata';
 import { getPlaybackSourceRef } from '../utils/appPlaybackGuards';
+import { isSegmentedAudioSource } from './playbackMediaSource';
 
 // src/services/playedTrackCache.ts
 
@@ -38,7 +39,7 @@ export const cachePlayedTrackAssets = async (
 
     // Audio needs a source that can actually be refetched: a blob: URL is this session's own handle
     // to bytes that are either already cached or on disk, so there is nothing to fetch and store.
-    if (src && !src.startsWith('blob:') && !await hasCachedSongAudio(song)) {
+    if (src && !src.startsWith('blob:') && !isSegmentedAudioSource(src) && !await hasCachedSongAudio(song)) {
         console.log('[Cache] Caching fully played song:', song.name);
         try {
             const response = await fetch(src);

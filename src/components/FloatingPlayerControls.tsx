@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Play, Pause } from 'lucide-react';
 import { MotionValue } from 'framer-motion';
 import ProgressBar from './ProgressBar';
-import { PlayerState, LyricData, Theme } from '../types';
+import { PlayerState, LyricData, Theme, type SongResult } from '../types';
+import MainEpisodeButton from './floating-player/MainEpisodeButton';
 import LyricsTimelineModal from './modal/LyricsTimelineModal';
 import TrackTitleNavigator from './floating-player/TrackTitleNavigator';
 import PlayerControlSlotButton from './floating-player/PlayerControlSlotButton';
@@ -49,7 +50,7 @@ export type SlotContextFromApp = Omit<
 >;
 
 interface FloatingPlayerControlsProps {
-    currentSong: { name: string; } | null;
+    currentSong: Pick<SongResult, 'name' | 'episode'> | null;
     playerState: PlayerState;
     currentTime: MotionValue<number>;
     lyricCurrentTime?: MotionValue<number>;
@@ -446,7 +447,7 @@ const FloatingPlayerControls: React.FC<FloatingPlayerControlsProps> = ({
 
 // 展开视图组件
 interface ExpandedViewProps {
-    currentSong: { name: string; } | null;
+    currentSong: Pick<SongResult, 'name' | 'episode'> | null;
     playerState: PlayerState;
     currentTime: MotionValue<number>;
     lyricCurrentTime?: MotionValue<number>;
@@ -543,6 +544,8 @@ const ExpandedView: React.FC<ExpandedViewProps> = ({
                     className="col-start-1 row-start-2 justify-self-end sm:justify-self-auto"
                 />
 
+                <div className="col-start-3 row-start-2 flex items-center justify-self-start gap-1 sm:contents">
+                {currentSong?.episode && <MainEpisodeButton color={primaryColor} disabled={controlsDisabled} />}
                 <PlayerControlSlotButton
                     actionId={slotSecondary}
                     context={slotContext}
@@ -551,6 +554,7 @@ const ExpandedView: React.FC<ExpandedViewProps> = ({
                     controlsDisabled={controlsDisabled}
                     className="col-start-3 row-start-2 justify-self-start sm:justify-self-auto"
                 />
+                </div>
             </div>
 
             {/* Row 2: Current Time, Progress Bar, Duration */}

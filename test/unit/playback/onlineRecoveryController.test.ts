@@ -62,6 +62,12 @@ const createController = (audioSrc: string) => {
 };
 
 describe('online playback recovery bounds', () => {
+    it('keeps one retry identity across renewed HLS sessions for the same episode', () => {
+        expect(getOnlineRecoveryKey('folia-hls://fanjiao/120361/one/index.m3u8'))
+            .toBe(getOnlineRecoveryKey('folia-hls://fanjiao/120361/two/index.m3u8'));
+        expect(getOnlineRecoveryKey('folia-hls://fanjiao/120361/one/index.m3u8'))
+            .not.toBe(getOnlineRecoveryKey('folia-hls://fanjiao/120362/one/index.m3u8'));
+    });
     beforeEach(() => {
         vi.clearAllMocks();
     });
