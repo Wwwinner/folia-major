@@ -91,6 +91,15 @@ describe('episode progress recording', () => {
         f.fire('playing'); cleanup();
         expect(wrongSave).not.toHaveBeenCalled();
     });
+    it('keeps the listening timestamp unchanged when a paused page later exits', () => {
+        const f = recorderFixture();
+        f.advance(1000); Object.assign(f.audio, { paused: false }); f.fire('playing');
+        f.audio.currentTime = 24; f.advance(3000); f.fire('timeupdate');
+        Object.assign(f.audio, { paused: true }); f.fire('pause');
+        f.advance(60000); f.view.dispatchEvent(new Event('pagehide'));
+        expect(f.save.mock.lastCall?.[1]).toMatchObject({ position: 24, lastPlayedAt: 4000, updatedAt: 64000, metadata: { albumId: 'album' } });
+        f.dispose();
+    });
     it('flushes on exit, marks ended complete, and returns completed episodes to the beginning', () => {
         const f = recorderFixture();
         Object.assign(f.audio, { paused: false }); f.fire('playing');

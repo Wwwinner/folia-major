@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 // 第二集回归：经实际分集列表点播，并确认有声输出和远距离跳转后仍是同一集。
-export async function verifyEpisodeTwo(page, output, errors) {
+export async function verifyEpisodeTwo(page, output, errors, { seekTimeout = 30000 } = {}) {
     // 列表打开时会自动定位当前曲目；等入场与定位结束再滚向末尾。
     await page.waitForTimeout(700);
     await page.getByTestId('side-panel-list').evaluate(panel => {
@@ -38,7 +38,7 @@ export async function verifyEpisodeTwo(page, output, errors) {
     await page.waitForFunction(() => [...document.querySelectorAll('audio')].some(audio => !audio.paused));
     await page.evaluate(() => { [...document.querySelectorAll('audio')].find(audio => !audio.paused).currentTime = 1200; });
     await page.waitForFunction(() => [...document.querySelectorAll('audio')].some(audio => !audio.paused
-        && !audio.seeking && audio.readyState >= 3 && audio.currentTime > 1201), null, { timeout: 30000 });
+        && !audio.seeking && audio.readyState >= 3 && audio.currentTime > 1201), null, { timeout: seekTimeout });
     assert.equal(await page.evaluate(() => window.__getPlaybackState().currentSong.id), '120484');
     await page.screenshot({ path: path.join(output, 'episode-two.png') });
     const result = { initial, audible: true, pauseResume: true, seekSeconds: 1200, errors };

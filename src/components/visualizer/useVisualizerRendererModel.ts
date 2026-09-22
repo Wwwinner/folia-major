@@ -151,8 +151,8 @@ export const useVisualizerRendererModel = ({
         visualizerTunings,
         onMonetTuningChange,
         ...assets,
-        // Only these two read a click on a lyric line; the rest have no line hit-testing at all.
-        onLyricLineSeek: ['monet', 'pendolo'].includes(visualizerMode) ? onLyricLineSeek : undefined,
+        // Only these modes read a click on a lyric line; the rest have no line hit-testing at all.
+        onLyricLineSeek: ['monet', 'pendolo', 'dialogue'].includes(visualizerMode) ? onLyricLineSeek : undefined,
         onBack,
         isPanelOpen,
         alwaysShowBackButton: alwaysShowPlayerBackButton || isPanelOpen,

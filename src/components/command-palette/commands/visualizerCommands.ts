@@ -45,6 +45,7 @@ export const visualizerCommands: CommandPaletteCommand[] = [
     createVisualizerCommand('tilt', 'Visualizer: Tilt', 'Switch to tilt visualizer', ['tilt', '倾诉']),
     createVisualizerCommand('claddagh', 'Visualizer: Claddagh', 'Switch to Claddagh visualizer', ['claddagh', '回环']),
     createVisualizerCommand('monet', 'Visualizer: Monet', 'Switch to Monet visualizer', ['monet', '莫奈', '切换到可视化：莫奈', '切换到可视化莫奈']),
+    createVisualizerCommand('dialogue', 'Visualizer: Dialogue', 'Switch to Dialogue visualizer', ['dialogue', '对白', '广播剧字幕', 'spoken subtitles']),
     createVisualizerCommand('pendolo', 'Visualizer: Pendolo', 'Switch to Pendolo visualizer', ['pendolo', '擒纵', '摆轮', 'pd', '切换到可视化：擒纵', '切换到可视化擒纵']),
     createVisualizerCommand('cappella', 'Visualizer: Cappella', 'Switch to cappella visualizer', ['cappella', '群唱']),
     createVisualizerCommand('diorama', 'Visualizer: Diorama', 'Switch to Diorama visualizer', ['diorama', '镜台', '切换到可视化：镜台', '切换到可视化镜台']),

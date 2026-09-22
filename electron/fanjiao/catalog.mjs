@@ -15,9 +15,13 @@ const cover = value => {
 };
 
 export function albumDto(raw) {
-    return { id: requireId(raw.album_id), name: text(raw.name),
-        coverUrl: cover(raw.square || raw.cover || raw.horizontal), description: text(raw.description),
+    return { id: requireId(raw.album_id), name: text(raw.name || raw.title),
+        coverUrl: cover(raw.square || raw.cover || raw.cover_url || raw.horizontal), description: text(raw.description),
         author: text(raw.author_name), publisher: text(raw.up_name),
+        playCount: Number.isSafeInteger(raw.play) && raw.play >= 0 ? raw.play : undefined,
+        posterUrl: cover(raw.cover || raw.square || raw.cover_url),
+        landscapeCoverUrl: cover(raw.horizontal),
+        latestEpisodeName: text(raw.new_audio_name), promotionLabel: text(raw.discount_name),
     };
 }
 

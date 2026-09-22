@@ -5,18 +5,47 @@ import assert from 'node:assert/strict';
 import { verifyEpisodeTwo } from './desktop-episode-two.mjs';
 import { verifyEpisodeProgress } from './desktop-episode-progress.mjs';
 import { verifyEpisodeNavigation } from './desktop-episode-navigation.mjs';
+import { verifyHome, verifyPopular } from './desktop-home.mjs';
+import { verifyHomeRail } from './desktop-home-rail.mjs';
+import { verifyAllSections } from './desktop-all-sections.mjs';
+import { verifyRankings } from './desktop-rankings.mjs';
+import { verifyBanner } from './desktop-banner.mjs';
+import { verifyHistory } from './desktop-history.mjs';
+import { verifyDialogue } from './desktop-dialogue.mjs';
+import { verifyStreamRecovery } from './desktop-stream-recovery.mjs';
+import { verifyEpisodeSix } from './desktop-episode-six.mjs';
+import { traceDesktopMedia } from './desktop-media-trace.mjs';
 
 // 在独立用户目录启动真实 Folia Electron；只保存无凭据的界面与验证摘要。
 const root = process.cwd();
 const episodeTwo = process.argv.includes('--episode-two');
 const episodeProgress = process.argv.includes('--episode-progress');
 const episodeNavigation = process.argv.includes('--episode-navigation');
-const output = path.join(root, episodeNavigation ? 'test-results/fanjiao-desktop-navigation' : episodeProgress ? 'test-results/fanjiao-desktop-progress' : episodeTwo ? 'test-results/fanjiao-desktop-ep2' : 'test-results/fanjiao-desktop');
+const homepage = process.argv.includes('--home');
+const popular = process.argv.includes('--popular');
+const homeRail = process.argv.includes('--home-rail');
+const allSections = process.argv.includes('--all-sections');
+const rankings = process.argv.includes('--rankings');
+const banner = process.argv.includes('--banner');
+const history = process.argv.includes('--history');
+const dialogue = process.argv.includes('--dialogue');
+const streamRecovery = process.argv.includes('--stream-recovery');
+const episodeSix = process.argv.includes('--episode-six');
+const output = path.join(root, streamRecovery ? 'test-results/fanjiao-desktop-stream-recovery' : dialogue ? 'test-results/fanjiao-desktop-dialogue' : history ? 'test-results/fanjiao-desktop-history' : banner ? 'test-results/fanjiao-desktop-banner' : rankings ? 'test-results/fanjiao-desktop-rankings' : allSections ? 'test-results/fanjiao-desktop-all-sections' : homeRail ? 'test-results/fanjiao-desktop-home-rail' : popular ? 'test-results/fanjiao-desktop-popular' : homepage ? 'test-results/fanjiao-desktop-home' : episodeNavigation ? 'test-results/fanjiao-desktop-navigation' : episodeProgress ? 'test-results/fanjiao-desktop-progress' : episodeTwo ? 'test-results/fanjiao-desktop-ep2' : 'test-results/fanjiao-desktop');
 await mkdir(output, { recursive: true });
 const app = await electron.launch({ executablePath: path.join(root, 'node_modules/electron/dist/electron.exe'),
     args: ['.', `--user-data-dir=${path.join(output, `profile-${process.pid}`)}`, '--autoplay-policy=no-user-gesture-required'],
     env: { ...process.env, ELECTRON_DEV: 'true' }, cwd: root, timeout: 60000 });
 try {
+    if (episodeSix) app.process().on('exit', (code, signal) => console.log('Isolated test exit:', code, signal));
+    if (episodeSix) app.process().stdout.on('data', bytes => {
+        for (const line of bytes.toString().split(/\r?\n/)) if (line.startsWith('[Media debug]')) console.log(line);
+    });
+    if (episodeSix) app.process().stderr?.on('data', bytes => {
+        for (const line of bytes.toString().split(/\r?\n/)) if (/Fanjiao stream|FATAL|crash|exited unexpectedly|Error|Exception|ERR_|^\s+at /.test(line)) {
+            console.log(line.replace(/(?:https?|folia-hls):\/\/\S+/g, '[url]').slice(0, 500));
+        }
+    });
     await app.firstWindow({ timeout: 60000 });
     let page;
     for (let attempt = 0; attempt < 120; attempt++) {
@@ -27,24 +56,39 @@ try {
     if (!page) throw new Error('Folia main window did not open');
     await page.bringToFront();
     console.log('Electron window created.');
+    if (episodeSix) await app.evaluate(({ app }) => {
+        process.on('uncaughtExceptionMonitor', error => {
+            console.log('[Media debug] uncaught', String(error.stack).replace(/(?:https?|folia-hls):\/\/\S+/g, '[url]'));
+            app.exit(1);
+        });
+    });
+    if (episodeSix && !process.argv.includes('--no-trace')) await traceDesktopMedia(app, output);
     const errors = [];
     const diagnostic = [];
+    const resourceFailures = [];
     page.on('console', message => {
         if (message.type() === 'warning' || message.type() === 'error' || /\[(?:Audio|Playback|HLS|Prefetch)\]/.test(message.text())) diagnostic.push(message.text().slice(0, 600));
+        if (episodeSix && /\[OnlinePlayback\]|\[HLS\]/.test(message.text())) console.log(message.text().replace(/(?:https?|folia-hls):\/\/\S+/g, '[url]').slice(0, 500));
     });
     page.on('response', response => {
         if (response.url().startsWith('folia-hls://')) diagnostic.push(`HLS response ${response.status()} ${new URL(response.url()).pathname.split('/')[1]} ${new URL(response.url()).pathname.split('/').at(-1)}`);
+        if (response.status() >= 400) {
+            const url = new URL(response.url());
+            resourceFailures.push({ status: response.status(), type: response.request().resourceType(), host: url.host,
+                path: url.protocol === 'folia-hls:' ? `/${url.pathname.split('/')[1]}/${url.pathname.split('/').at(-1)}` : url.pathname });
+        }
     });
     page.on('pageerror', error => errors.push(error.message.slice(0, 200)));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text().slice(0, 200)); });
     await page.waitForLoadState('domcontentloaded');
     await page.waitForSelector('audio', { state: 'attached', timeout: 20000 }).catch(() => {});
-    await page.evaluate(async () => {
+    await page.evaluate(async standard => {
         const moduleUrl = name => performance.getEntriesByType('resource').find(entry => entry.name.includes(name)).name;
         window.__getPlaybackState = (await import(moduleUrl('/src/stores/usePlaybackStore.ts'))).usePlaybackStore.getState;
         window.__getCollectionState = (await import(moduleUrl('/src/stores/useCollectionNavigationStore.ts'))).useCollectionNavigationStore.getState;
         window.__getAssignedSource = (await import(moduleUrl('/src/services/playbackMediaSource.ts'))).getAssignedAudioSource;
-    });
+        if (standard) (await import(moduleUrl('/src/stores/useAudioSettingsStore.ts'))).useAudioSettingsStore.getState().setAudioQuality('standard');
+    }, episodeSix && process.argv.includes('--standard'));
     await page.screenshot({ path: path.join(output, 'initial.png') });
     await writeFile(path.join(output, 'initial.json'), JSON.stringify({ title: await page.title(), errors,
         text: (await page.locator('body').innerText()).slice(0, 5000) }, null, 2));
@@ -61,16 +105,31 @@ try {
             await page.getByRole('button', { name: '切换至饭角' }).click();
             await page.getByRole('button', { name: '确定', exact: true }).click();
         }
-        await page.getByPlaceholder('搜索广播剧…').first().fill('冬日花火');
+        if (history) {
+            await verifyHistory(page, output, errors, resourceFailures);
+        } else if (banner) {
+            await verifyBanner(page, output, errors, resourceFailures);
+        } else if (rankings) {
+            await verifyRankings(page, output, errors, resourceFailures);
+        } else if (allSections) {
+            await verifyAllSections(page, output, errors, resourceFailures);
+        } else if (homeRail) {
+            await verifyHomeRail(page, output, errors, resourceFailures);
+        } else if (popular) {
+            await verifyPopular(page, output, errors, resourceFailures);
+        } else if (homepage) {
+            await verifyHome(page, output, errors, resourceFailures);
+        } else {
+        await page.getByPlaceholder('搜索广播剧…').first().fill(episodeSix ? '总裁，夫人和白月光跑了' : '冬日花火');
         await page.getByPlaceholder('搜索广播剧…').first().press('Enter');
-        const album = page.getByRole('button', { name: /冬日花火/ }).first();
+        const album = page.locator('section.fixed.inset-0').getByRole('button', { name: episodeSix ? /总裁，夫人和白月光跑了/ : /冬日花火/ }).first();
         await album.waitFor();
         await page.screenshot({ path: path.join(output, 'search.png') });
         await album.click();
-        await page.waitForFunction(() => {
+        await page.waitForFunction(expectedId => {
             const state = window.__getCollectionState();
-            return state.snapshot?.stack.at(-1)?.id === '111726';
-        });
+            return state.snapshot?.stack.at(-1)?.id === expectedId;
+        }, episodeSix ? '111421' : '111726');
         await page.getByRole('button', { name: '查看曲目', exact: true }).waitFor();
         await page.screenshot({ path: path.join(output, 'album.png') });
         await writeFile(path.join(output, 'album.json'), JSON.stringify({ errors,
@@ -92,7 +151,13 @@ try {
             };
         });
         await page.getByRole('button', { name: '查看曲目', exact: true }).click();
-        if (episodeNavigation) {
+        if (episodeSix) {
+            await verifyEpisodeSix(page, output, app);
+        } else if (streamRecovery) {
+            await verifyStreamRecovery(page, app, output, errors);
+        } else if (dialogue) {
+            await verifyDialogue(page, output, errors, resourceFailures);
+        } else if (episodeNavigation) {
             await verifyEpisodeNavigation(page, output);
         } else if (episodeProgress) {
             await verifyEpisodeProgress(page, output);
@@ -181,11 +246,16 @@ try {
         await writeFile(path.join(output, 'playback.json'), JSON.stringify(result, null, 2));
         console.log('Desktop playback verification passed:', JSON.stringify(result));
         }
+        }
     } catch (error) {
-        await page.screenshot({ path: path.join(output, 'failure.png') });
+        if (page.isClosed()) {
+            console.error('Desktop verification closed early:', String(error.message).replace(/(?:https?|folia-hls):\/\/\S+/g, '[url]').slice(0, 400));
+            throw error;
+        }
         await writeFile(path.join(output, 'failure.json'), JSON.stringify({ error: error.message, errors,
-            diagnostic, events: await page.evaluate(() => window.__fanjiaoEvents),
+            diagnostic, resourceFailures, events: await page.evaluate(() => window.__fanjiaoEvents),
             text: (await page.locator('body').innerText()).slice(0, 8000) }, null, 2));
+        await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {});
         throw error;
     }
 } finally { await app.close(); }

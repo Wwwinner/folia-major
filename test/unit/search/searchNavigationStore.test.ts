@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveCommandPaletteSearchSource, useSearchNavigationStore } from '@/stores/useSearchNavigationStore';
+import { resolveSearchSource, resolveCommandPaletteSearchSource, useSearchNavigationStore } from '@/stores/useSearchNavigationStore';
 import { neteaseApi } from '@/services/netease';
 import { getNavidromeConfig, navidromeApi } from '@/services/navidromeService';
 import type { LocalLibraryAssignment, LocalLibraryEntity } from '@/types/localLibrary';
@@ -63,6 +63,12 @@ describe('useSearchNavigationStore', () => {
             durationMs: 1,
         }, 'netease', 'kugou')).toBe('kugou');
         expect(resolveCommandPaletteSearchSource(null, 'netease', 'kugou')).toBe('kugou');
+    });
+    it('treats history as an online home tab rather than a provider identity', () => {
+        expect(resolveSearchSource('history')).toBe('netease');
+        expect(resolveCommandPaletteSearchSource(null, resolveSearchSource('history'), 'fanjiao')).toBe('fanjiao');
+        useSearchNavigationStore.getState().setHomeViewTab('history');
+        expect(useSearchNavigationStore.getState().homeViewTab).toBe('history');
     });
 
     it('submits a local search and opens the overlay', async () => {

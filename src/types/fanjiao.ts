@@ -1,4 +1,4 @@
-import type { ProviderAudioSource, ProviderLyricsResult, ProviderPage } from './onlineMusic';
+import type { CollectionBrowseFilter, CollectionRanking, HomeDiscoverySection, ProviderAudioSource, ProviderLyricsResult, ProviderPage } from './onlineMusic';
 
 // 饭角主进程白名单 DTO；临时媒体授权不属于 renderer 合同。
 export interface FanjiaoAlbum {
@@ -8,6 +8,12 @@ export interface FanjiaoAlbum {
     description: string;
     author: string;
     publisher: string;
+    playCount?: number;
+    posterUrl?: string;
+    landscapeCoverUrl?: string;
+    latestEpisodeName?: string;
+    promotionLabel?: string;
+    ranking?: CollectionRanking;
 }
 
 export interface FanjiaoEpisode {
@@ -23,6 +29,10 @@ export interface FanjiaoEpisode {
 }
 
 export interface FanjiaoResponses {
+    homeSections: ProviderPage<HomeDiscoverySection<FanjiaoAlbum>>;
+    sectionAlbums: ProviderPage<FanjiaoAlbum>;
+    browseFilters: CollectionBrowseFilter[];
+    browseAlbums: ProviderPage<FanjiaoAlbum>;
     searchAlbums: ProviderPage<FanjiaoAlbum>;
     album: FanjiaoAlbum;
     episodes: FanjiaoEpisode[];

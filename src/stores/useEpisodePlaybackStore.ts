@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { SongResult } from '../types';
 import { getEpisodeKey, getResumePosition, validEpisodeProgress, type EpisodeProgress } from '../utils/episodePlayback';
 import { isEpisodeSource } from '../services/playbackMediaSource';
+import { episodeMetadataFromSong, getEpisodeHistoryTime, normalizeEpisodeProgress } from '../utils/episodeHistory';
 
 // 逐集收听位置属于本机历史；同步写入轻量记录，避免退出时等待异步数据库事务。
 export const EPISODE_PROGRESS_STORAGE_KEY = 'folia_episode_progress_v1';
@@ -12,9 +13,12 @@ const storage = () => typeof localStorage === 'undefined' ? null : localStorage;
 function readProgress(): Record<string, EpisodeProgress> {
     try {
         const raw = JSON.parse(storage()?.getItem(EPISODE_PROGRESS_STORAGE_KEY) || '{}');
-        return Object.fromEntries(Object.entries(raw).filter(([key, value]) => key.startsWith('online:') && validEpisodeProgress(value))
-            .sort((a, b) => (b[1] as EpisodeProgress).updatedAt - (a[1] as EpisodeProgress).updatedAt)
-            .slice(0, MAX_ENTRIES)) as Record<string, EpisodeProgress>;
+        const entries: Array<[string, EpisodeProgress]> = [];
+        for (const [key, value] of Object.entries(raw)) {
+            const normalized = normalizeEpisodeProgress(value);
+            if (key.startsWith('online:') && normalized) entries.push([key, normalized]);
+        }
+        return Object.fromEntries(entries.sort((a, b) => getEpisodeHistoryTime(b[1]) - getEpisodeHistoryTime(a[1])).slice(0, MAX_ENTRIES));
     } catch { return {}; }
 }
 function readMainOnly() {
@@ -30,6 +34,7 @@ interface EpisodePlaybackState {
     progress: Record<string, EpisodeProgress>;
     toggleMainOnly: () => void;
     saveProgress: (key: string, value: EpisodeProgress) => void;
+    hydrateMetadata: (songs: SongResult[]) => void;
     restartEpisode: (song: SongResult) => void;
 }
 export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) => ({
@@ -42,9 +47,25 @@ export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) =
     },
     saveProgress: (key, value) => {
         if (pendingRestarts.has(key) || !key.startsWith('online:') || !validEpisodeProgress(value)) return;
-        const entries = Object.entries({ ...get().progress, [key]: value })
-            .sort((a, b) => b[1].updatedAt - a[1].updatedAt).slice(0, MAX_ENTRIES);
+        const previous = get().progress[key];
+        const next = normalizeEpisodeProgress({ ...previous, ...value, metadata: value.metadata ?? previous?.metadata })!;
+        if (next.lastPlayedAt === 0 && previous) next.lastPlayedAt = getEpisodeHistoryTime(previous);
+        const entries = Object.entries({ ...get().progress, [key]: next })
+            .sort((a, b) => getEpisodeHistoryTime(b[1]) - getEpisodeHistoryTime(a[1])).slice(0, MAX_ENTRIES);
         const progress = Object.fromEntries(entries);
+        persist(EPISODE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+        set({ progress });
+    },
+    hydrateMetadata: songs => {
+        const progress = { ...get().progress };
+        let changed = false;
+        for (const song of songs) {
+            const key = getEpisodeKey(song);
+            const metadata = episodeMetadataFromSong(song);
+            if (!key || !metadata || !progress[key] || progress[key].metadata) continue;
+            progress[key] = { ...progress[key], metadata }; changed = true;
+        }
+        if (!changed) return;
         persist(EPISODE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
         set({ progress });
     },
@@ -53,7 +74,7 @@ export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) =
         if (!key) return;
         pendingRestarts.add(key);
         const progress = { ...get().progress };
-        delete progress[key];
+        if (progress[key]) progress[key] = { ...progress[key], position: 0, completed: false };
         persist(EPISODE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
         set({ progress });
     },

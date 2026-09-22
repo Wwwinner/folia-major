@@ -13,11 +13,12 @@ UI / hooks / stores / app services
                  -> kugouTransport.ts（酷狗请求/IPC 边界）
             -> qqProvider.ts
                  -> qqTransport.ts（QQ 音乐请求边界）
+            -> fanjiaoProvider.ts（饭角 Electron 目录与媒体边界）
        -> providerAccountCache.ts / providerStorage.ts
   -> src/types/onlineMusic.ts（共享合同）
 ```
 
-当前 registry 注册 `netease`、`kugou` 和 `qq`。Navidrome 是独立的 Subsonic 服务，入口是 `src/services/navidromeService.ts`，不属于 Omni provider。
+当前 registry 注册 `netease`、`kugou`、`qq` 和 `fanjiao`。Navidrome 是独立的 Subsonic 服务，入口是 `src/services/navidromeService.ts`，不属于 Omni provider。
 
 ## Public contract
 
@@ -30,6 +31,7 @@ UI / hooks / stores / app services
 | 搜索 | `searchSongs`、`searchProviderSongs` | 普通搜索按 active provider；显式 provider 或跨 provider 用第二个方法 |
 | 用户库 | `getUserPlaylists`、`getProviderUserPlaylists`、`getUserAlbums`、`getLikedSongIds`、`getCloudCollection` | 统一 `OmniCollection` / page 类型，账号快照可先展示再静默刷新 |
 | 推荐 | `getHomeFeed`、`getPersonalFm`、`getDailySongs`、`getRecommendationHistory*`、`dislikeSong` | 首页推荐与历史推荐仍由 Omni 路由 |
+| 公开发现页 | `getHomeSections`、`getDiscoverySectionCollections`、`getCollectionBrowseFilters`、`browseCollections` | `publicDiscovery` 与账号推荐分开；返回归一化栏目、筛选项与专辑分页；榜单复用栏目分页，通过 `CollectionRanking` 保留名次和指标，不要求用户库登录 |
 | 播放/歌词 | `getSongDetail`、`canPlaySong`、`getAudioSource`、`getLyrics`、`getChorusRanges` | 输出 `OmniAudioSource` / `OmniLyricsResult`；Navidrome 歌词走独立 service |
 | 听歌上报 | `canReportPlayback`、`reportPlayback` | 只有声明 `playbackReports` 的 provider 支持（当前仅网易云）；时长必须是真实累计播放秒数，频控在 `playbackReportGate.ts` |
 | 可用性 | `getSongAvailability`、`getSongReplacement` | 保留 unsupported / unavailable / auth 等 `OmniError` 语义 |
@@ -90,6 +92,8 @@ await omni.getCollectionTracks(collection, { limit: 50, offset: 0 });
 跨 provider 的 numeric id 不可直接去重；`online:netease:123` 与 `online:kugou:123` 默认是两个播放身份。
 
 ## Fast lookup
+
+饭角本机历史与续播使用 `useEpisodePlaybackStore` 的同一份逐集记录。展示元数据不足时由历史 hook 经 `omni.getSongDetail` 补齐；点播统一经过 `useEpisodeResume` → `loadEpisodeAlbumQueue` → `omni.getCollectionTracks`，再交给已有播放入口。不额外持久化原始接口响应或媒体授权。
 
 ```powershell
 rg -n "export const omni|searchSongs|getLyrics|getAudioSource|updateCollectionTracks" src/services/onlineMusic/omni.ts

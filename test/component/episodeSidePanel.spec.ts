@@ -56,7 +56,9 @@ for (const width of [1100, 390]) {
 for (const reducedMotion of [false, true]) {
     test(`面板宽度过渡保留阅读位置（减少动态效果：${reducedMotion}）`, async ({ mount, page }) => {
         await page.setViewportSize({ width: 1100, height: 900 });
-        await page.emulateMedia({ reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
+        // 项目默认不跟随系统；面板应遵守用户对 UI 微动效的显式选择。
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.addInitScript(enabled => localStorage.setItem('reduce_motion_uiMicroMotion', String(enabled)), reducedMotion);
         await mount('episodeSidePanel');
         const panel = page.getByTestId('side-panel-list');
         await expect(panel.locator('[data-episode-id="51"]')).toBeInViewport({ ratio: 1 });

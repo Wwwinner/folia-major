@@ -2,11 +2,21 @@ import type { SongResult } from '../types';
 import { getPlaybackSongKey } from './appPlaybackGuards';
 
 // 广播剧队列与进度规则；不根据标题猜分类，也不影响普通音乐队列。
+export interface EpisodeHistoryMetadata {
+    name: string;
+    albumId: string;
+    albumName: string;
+    coverUrl: string;
+    author: string;
+    kind: 'main' | 'extra' | 'unknown';
+}
 export interface EpisodeProgress {
     position: number;
     duration: number;
     completed: boolean;
     updatedAt: number;
+    lastPlayedAt?: number;
+    metadata?: EpisodeHistoryMetadata;
 }
 export const getEpisodeKey = (song: SongResult | null | undefined): string | null =>
     song?.episode && song.sourceRef?.kind === 'online' ? getPlaybackSongKey(song) : null;
@@ -42,5 +52,6 @@ export function validEpisodeProgress(value: unknown): value is EpisodeProgress {
     const p = value as EpisodeProgress;
     return Number.isFinite(p.position) && p.position >= 0 && Number.isFinite(p.duration) && p.duration > 0
         && p.position <= p.duration && typeof p.completed === 'boolean'
-        && Number.isFinite(p.updatedAt) && p.updatedAt >= 0;
+        && Number.isFinite(p.updatedAt) && p.updatedAt >= 0
+        && (p.lastPlayedAt === undefined || (Number.isFinite(p.lastPlayedAt) && p.lastPlayedAt >= 0));
 }

@@ -14,10 +14,14 @@ function createFanjiaoBridge({ app }) {
   let service;
   let loading;
   let disposed = false;
-  const initialize = () => loading ||= import(pathToFileURL(path.join(__dirname, 'service.mjs')).href).then(module => {
-    service = module.createFanjiaoService({ secret: module.readSigningSecret({
+  const initialize = () => loading ||= import(pathToFileURL(path.join(__dirname, 'service.mjs')).href).then(async module => {
+    const { readMediaProxy, createMediaTransport } = await import(pathToFileURL(path.join(__dirname, 'mediaTransport.mjs')).href);
+    const locations = {
       appPath: app.getAppPath(), userData: app.getPath('userData'), isDev: !app.isPackaged,
-    }) });
+    };
+    const { session, net } = require('electron');
+    const mediaTransport = await createMediaTransport(readMediaProxy(locations), session, net);
+    service = module.createFanjiaoService({ secret: module.readSigningSecret(locations), mediaTransport });
     if (disposed) service.dispose();
     return service;
   });

@@ -1,11 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Plus } from 'lucide-react';
 import { List as VirtualList } from 'react-window';
 import { useTranslation } from 'react-i18next';
 import { getSizedCoverUrl } from '../../utils/coverUrl';
 import { getSongArtistLabel, getSongCoverUrl } from '../../services/onlineMusic/songMetadata';
 import { useSidePanelBottomPx } from '../../hooks/usePlayerBottomBarBottomPx';
+import { useReducedMotionFor } from '../../hooks/useReducedMotionFor';
 
 export interface SidePanelListProps<T> {
     isOpen: boolean;
@@ -20,6 +21,7 @@ export interface SidePanelListProps<T> {
     hideTitle?: boolean;
     headerLeadingActions?: React.ReactNode;
     headerActions?: React.ReactNode;
+    className?: string;
 }
 
 const RowComponent = ({ index, style, items, renderItem, columns }: any): React.ReactElement => {
@@ -48,9 +50,10 @@ export function SidePanelList<T>({
     hideTitle = false,
     headerLeadingActions,
     headerActions,
+    className = '',
 }: SidePanelListProps<T>) {
     const { t } = useTranslation();
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = useReducedMotionFor('uiMicroMotion');
     const [listHeight, setListHeight] = useState(400);
     const measuredHeightRef = useRef(400);
     const listContainerRef = useRef<HTMLDivElement>(null);
@@ -147,7 +150,8 @@ export function SidePanelList<T>({
                         width: { duration: reducedMotion ? 0 : 0.32, ease: [0.22, 1, 0.36, 1] } }}
                     data-testid="side-panel-list"
                     data-columns={columns}
-                    className="absolute right-6 top-24 max-w-[calc(100vw-3rem)] rounded-3xl z-[80] flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel"
+                    role="region" aria-label={title}
+                    className={`absolute right-6 top-24 max-w-[calc(100vw-3rem)] rounded-3xl z-[80] flex flex-col p-6 shadow-2xl border backdrop-blur-2xl pointer-events-auto theme-glass-panel ${className}`}
                     style={{
                         bottom: bottomBarBottomPx,
                         boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
@@ -167,6 +171,7 @@ export function SidePanelList<T>({
                         <div className="flex items-center gap-1 shrink-0">
                             {headerActions}
                             <button
+                                type="button" data-panel-close aria-label={t('ui.close')}
                                 onClick={onClose}
                                 className="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                             >

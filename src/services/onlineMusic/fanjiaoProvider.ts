@@ -14,7 +14,8 @@ async function request<T extends FanjiaoOperation>(operation: T,
 
 export function normalizeFanjiaoAlbum(raw: FanjiaoAlbum): ProviderCollection {
     return { providerId: 'fanjiao', id: raw.id, name: raw.name, type: 'album',
-        coverUrl: raw.coverUrl, description: raw.description, publisher: raw.publisher,
+        coverUrl: raw.coverUrl, description: raw.description, publisher: raw.publisher, playCount: raw.playCount,
+        posterUrl: raw.posterUrl, landscapeCoverUrl: raw.landscapeCoverUrl, latestEpisodeName: raw.latestEpisodeName, promotionLabel: raw.promotionLabel, ranking: raw.ranking,
         artists: raw.author ? [{ id: `author:${raw.author}`, name: raw.author }] : [] };
 }
 
@@ -41,7 +42,7 @@ export const fanjiaoProvider: OnlineMusicProvider = {
         ? { configured: true } : { configured: false, reason: 'runtime-unavailable' },
     capabilities: { search: false, albumSearch: true, playback: true, lyrics: true, auth: false,
         userLibrary: false, playlists: false, albums: true, artists: false, recommendations: false,
-        mutations: false, wordByWordLyrics: false, alternativeLyrics: false },
+        mutations: false, wordByWordLyrics: false, alternativeLyrics: false, publicDiscovery: true },
     normalizeSong: raw => normalizeFanjiaoEpisode(raw as FanjiaoEpisode),
     search: {
         searchSongs: async () => { throw new OnlineProviderError('unsupported', '饭角支持专辑搜索', 'fanjiao'); },
@@ -56,6 +57,22 @@ export const fanjiaoProvider: OnlineMusicProvider = {
             const episodes = await request('episodes', { id: String(id) });
             const items = episodes.slice(offset, offset + limit).map(normalizeFanjiaoEpisode);
             return { items, total: episodes.length, hasMore: offset + items.length < episodes.length, nextOffset: offset + items.length };
+        },
+    },
+    discovery: {
+        getSectionCollections: async (id, limit, offset) => {
+            const page = await request('sectionAlbums', { id, limit, offset });
+            return { ...page, items: page.items.map(normalizeFanjiaoAlbum) };
+        },
+        getHomeSections: async (limit, offset) => {
+            const page = await request('homeSections', { limit, offset });
+            return { ...page, items: page.items.map(section => ({ ...section, items: section.items.map(normalizeFanjiaoAlbum),
+                banners: section.banners?.map(banner => ({ ...banner, album: normalizeFanjiaoAlbum(banner.album) })) })) };
+        },
+        getBrowseFilters: () => request('browseFilters'),
+        browseCollections: async (query, limit, offset) => {
+            const page = await request('browseAlbums', { ...query, limit, offset });
+            return { ...page, items: page.items.map(normalizeFanjiaoAlbum) };
         },
     },
     playback: {

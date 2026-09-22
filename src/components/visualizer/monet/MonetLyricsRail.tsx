@@ -5,8 +5,13 @@ import { resolveThemeFontWeight } from '../../../utils/fontStacks';
 import type { GraphemeTiming } from '../../../utils/lyrics/graphemeTiming';
 import { getLineRenderEndTime } from '../../../utils/lyrics/renderHints';
 import { useFontsEpoch } from '../../../hooks/useFontsEpoch';
+import { useReducedMotionFor } from '../../../hooks/useReducedMotionFor';
+import type { VisualizerSharedProps } from '../definition';
 import { colorWithAlpha, mixColors } from '../colorMix';
-import { resolveMonetFillWidth, resolveMonetGlow, MONET_SCROLL_SPRING, MONET_SCALE_SPRING } from './monetLyricMotion';
+import { buildMonetGlowShadow, resolveMonetFillWidth, resolveMonetGlow, MONET_SCROLL_SPRING, MONET_SCALE_SPRING } from './monetLyricMotion';
+import MonetSentenceText from './MonetSentenceText';
+import { DialogueMistReveal } from '../dialogue/DialogueMist';
+import { centerDialogueActiveGroup, fitDialogueActiveGroup, positionDialogueMistQueue, retainDialogueActiveEntries } from '../dialogue/dialogueRailEntries';
 import {
     buildWordColorRangesFromMatchers,
     prepareWordColorMatchers,
@@ -17,6 +22,7 @@ import {
 import {
     MONET_RAIL_BASE_MAX_HEIGHT_PX,
     MONET_RAIL_BASE_MAX_WIDTH_PX,
+    applyMonetSentenceRows,
     buildMonetDisplayTokens,
     clearMonetMeasurementCaches,
     measureMonetGraphemeOffsets,
@@ -45,12 +51,14 @@ interface MonetLyricsRailProps {
     translationFontStack?: string;
     subtitleTheme?: Theme;
     keywordColoringEnabled: boolean;
+    glowIntensity?: number;
     emptyText: string;
     showSubtitleTranslation?: boolean;
     audioPower?: MotionValue<number>;
     audioBands?: AudioBands;
     onLyricLineSeek?: (lyricTimeSec: number) => void;
     seekDisabled?: boolean;
+    sentencePlayback?: VisualizerSharedProps['sentencePlayback'];
     /** Shared large-screen factor. Owned by VisualizerMonet so the column and the font scale together. */
     layoutScale?: number;
 }
@@ -74,6 +82,7 @@ interface PositionedMonetLineEntry extends MonetVisibleLineEntry {
     tone: MonetLineTone;
     layout: MonetMeasuredLineLayout;
     scaledHeight: number;
+    measureKey: string;
 }
 
 type MonetLayoutCache = Map<string, MonetMeasuredLineLayout>;
@@ -222,6 +231,7 @@ const buildMonetLayoutCacheKey = (
     translationFontWeight: number,
     maxWidthPx: number,
     showSubtitleTranslation: boolean,
+    wholeLine: boolean,
 ) => [
     entry.index,
     entry.line.startTime,
@@ -237,6 +247,7 @@ const buildMonetLayoutCacheKey = (
     translationFontWeight,
     maxWidthPx,
     showSubtitleTranslation ? 1 : 0,
+    wholeLine ? 1 : 0,
 ].join('\u0001');
 
 const getOrMeasureMonetLineLayout = (
@@ -250,16 +261,19 @@ const getOrMeasureMonetLineLayout = (
     translationFontWeight: number,
     maxWidthPx: number,
     showSubtitleTranslation: boolean,
+    wholeLine: boolean,
+    sentenceRows: Map<string, number>,
 ) => {
-    const cacheKey = buildMonetLayoutCacheKey(entry, fontPx, translationFontPx, fontStack, translationFontStack, fontWeight, translationFontWeight, maxWidthPx, showSubtitleTranslation);
+    const cacheKey = buildMonetLayoutCacheKey(entry, fontPx, translationFontPx, fontStack, translationFontStack, fontWeight, translationFontWeight, maxWidthPx, showSubtitleTranslation, wholeLine);
     const cached = cache.get(cacheKey);
     if (cached) {
-        return cached;
+        return { layout: cached, measureKey: cacheKey };
     }
 
-    const layout = measureMonetLineLayout({
+    let layout = measureMonetLineLayout({
         line: entry.line,
-        status: entry.status,
+        // 预排版完整下一句，但不挂载文本；激活时无需先从两行盒子重新展开。
+        status: wholeLine && entry.status === 'waiting' ? 'active' : entry.status,
         fontPx,
         translationFontPx,
         fontStack,
@@ -268,10 +282,13 @@ const getOrMeasureMonetLineLayout = (
         translationFontWeight,
         maxWidthPx,
         showSubtitleTranslation,
+        wholeLine,
     });
+    const measuredRows = wholeLine ? sentenceRows.get(cacheKey) : undefined;
+    if (measuredRows !== undefined) layout = applyMonetSentenceRows(layout, measuredRows, entry.status);
     trimOldestCacheEntry(cache, MONET_LAYOUT_CACHE_LIMIT);
     cache.set(cacheKey, layout);
-    return layout;
+    return { layout, measureKey: cacheKey };
 };
 
 const useMonetRailSize = (ref: React.RefObject<HTMLDivElement | null>): MonetRailSize => {
@@ -321,18 +338,21 @@ const buildPositionedEntries = (
     glowBufferPx: number,
     showSubtitleTranslation: boolean,
     layoutCache: MonetLayoutCache,
+    wholeLine: boolean,
+    sentenceRows: Map<string, number>,
+    followActiveGroup: boolean,
 ): PositionedMonetLineEntry[] => {
     const railWidth = railSize.width || MONET_RAIL_WIDTH_FALLBACK_PX;
     const railHeight = railSize.height || MONET_RAIL_HEIGHT_FALLBACK_PX;
     const inactiveScale = clamp(inactiveFontPx / Math.max(lyricFontPx, 1), 0.72, 0.92);
     const contentWidthPx = Math.max(railWidth - glowBufferPx * 2, 0);
 
-    const measuredEntries: PositionedMonetLineEntry[] = entries.map(entry => {
+    let measuredEntries: PositionedMonetLineEntry[] = entries.map(entry => {
         const tone = {
             ...resolveLineTone(entry, theme, inactiveScale),
             fontWeight,
         };
-        const layout = getOrMeasureMonetLineLayout(
+        const { layout, measureKey } = getOrMeasureMonetLineLayout(
             layoutCache,
             entry,
             lyricFontPx,
@@ -343,6 +363,8 @@ const buildPositionedEntries = (
             translationFontWeight,
             contentWidthPx - 8,
             showSubtitleTranslation,
+            wholeLine,
+            sentenceRows,
         );
 
         return {
@@ -350,6 +372,7 @@ const buildPositionedEntries = (
             y: 0,
             tone,
             layout,
+            measureKey,
             scaledHeight: layout.visualHeightPx * tone.scale,
         };
     });
@@ -358,6 +381,8 @@ const buildPositionedEntries = (
         return [];
     }
 
+    if (followActiveGroup) measuredEntries = fitDialogueActiveGroup(measuredEntries, railHeight,
+        (previous, next) => resolveLineGap(previous, next, lyricFontPx));
     const anchorIndex = Math.max(0, measuredEntries.findIndex(entry => entry.offset === 0));
     const focusCenterY = railHeight * 0.46;
     measuredEntries[anchorIndex].y = focusCenterY - measuredEntries[anchorIndex].scaledHeight / 2;
@@ -374,7 +399,8 @@ const buildPositionedEntries = (
         current.y = next.y - current.scaledHeight - resolveLineGap(current, next, lyricFontPx);
     }
 
-    return measuredEntries;
+    return followActiveGroup
+        ? positionDialogueMistQueue(centerDialogueActiveGroup(measuredEntries, railHeight), railHeight) : measuredEntries;
 };
 
 const getLineMask = (isClipped: boolean, fadePx: number) => (
@@ -434,6 +460,7 @@ const MonetTimedTokenSpan: React.FC<{
     currentTime: MotionValue<number>;
     accentColor: string;
     fontPx: number;
+    glowIntensity: number;
     fontStack: string;
     fontsEpoch: number;
     wordColorMatchers: WordColorMatcher[];
@@ -441,7 +468,7 @@ const MonetTimedTokenSpan: React.FC<{
     chorusAccentColor?: string;
     audioPower?: MotionValue<number>;
     renderStaticPassed?: boolean;
-}> = ({ entry, currentTime, accentColor, fontPx, fontStack, fontsEpoch, wordColorMatchers, isChorus, chorusAccentColor, audioPower, renderStaticPassed = false }) => {
+}> = ({ entry, currentTime, accentColor, fontPx, glowIntensity, fontStack, fontsEpoch, wordColorMatchers, isChorus, chorusAccentColor, audioPower, renderStaticPassed = false }) => {
     const lineRenderEndTime = useMemo(() => getLineRenderEndTime(entry.line), [entry.line]);
     const tokens = useMemo(() => buildMonetDisplayTokens(entry.line), [entry.line]);
     const wordColorRanges = useMemo(
@@ -487,6 +514,7 @@ const MonetTimedTokenSpan: React.FC<{
                         lineStatus={entry.status}
                         wordColor={tokenColors.get(token.key) ?? resolvedAccentColor}
                         baseColor={entry.tone.baseColor}
+                        glowIntensity={glowIntensity}
                         fontPx={fontPx}
                         fontSpec={fontSpec}
                         fontsEpoch={fontsEpoch}
@@ -514,6 +542,7 @@ const MonetWordSweep: React.FC<{
     wordColor: string;
     baseColor: string;
     fontPx: number;
+    glowIntensity: number;
     fontSpec: string;
     /** Bumped when web fonts load; measured offsets are stale until then. */
     fontsEpoch: number;
@@ -530,6 +559,7 @@ const MonetWordSweep: React.FC<{
     wordColor,
     baseColor,
     fontPx,
+    glowIntensity,
     fontSpec,
     fontsEpoch,
     isChorus,
@@ -581,13 +611,7 @@ const MonetWordSweep: React.FC<{
 
             const intensity = resolveMonetGlow(latest, startTime, endTime, lineRenderEndTime);
 
-            if (intensity <= 0) return 'none';
-
-            const radiusOne = Math.round(fontPx * (isChorus ? 0.45 : 0.28));
-            const radiusTwo = Math.round(fontPx * (isChorus ? 0.90 : 0.65));
-            const maxAlpha = isChorus ? 1.0 : 0.88;
-            const glowColor = mixColors(baseColor, wordColor, intensity, intensity * maxAlpha);
-            return `0 0 ${radiusOne}px ${glowColor}, 0 0 ${radiusTwo}px ${glowColor}`;
+            return buildMonetGlowShadow(fontPx, baseColor, wordColor, intensity, isChorus, glowIntensity);
         }) as unknown as MotionValue<string>;
 
         // Glyphs with deep descenders (g, j, p, y, and many CJK forms) sit below the line box
@@ -598,7 +622,7 @@ const MonetWordSweep: React.FC<{
         const sweepOverflowPx = Math.round(fontPx * 0.5);
 
         return (
-            <span className="relative inline-block whitespace-pre-wrap break-words">
+            <span data-monet-word-sweep className="relative inline-block whitespace-pre-wrap break-words">
                 <motion.span style={{ color: resolvedBaseColor, textShadow: glowShadow }}>
                     {text}
                 </motion.span>
@@ -647,6 +671,7 @@ const MonetRailLine: React.FC<{
     currentTime: MotionValue<number>;
     theme: Theme;
     lyricFontPx: number;
+    glowIntensity: number;
     translationFontPx: number;
     fontStack: string;
     translationFontStack: string;
@@ -661,13 +686,19 @@ const MonetRailLine: React.FC<{
     canSeek?: boolean;
     disableEntryMotion?: boolean;
     renderStaticPassed?: boolean;
-}> = ({ entry, currentTime, theme, lyricFontPx, translationFontPx, fontStack, translationFontStack, translationFontWeight, glowBufferPx, vGlowBufferPx, fontsEpoch, wordColorMatchers, showSubtitleTranslation, audioPower, onLineSeek, canSeek = false, disableEntryMotion = false, renderStaticPassed = false }) => {
+    wholeLine?: boolean;
+    reducedMotion?: boolean;
+    mistEntryY?: number;
+    onSentenceMeasure: (key: string, rows: number) => void;
+}> = ({ entry, currentTime, theme, lyricFontPx, glowIntensity, translationFontPx, fontStack, translationFontStack, translationFontWeight, glowBufferPx, vGlowBufferPx, fontsEpoch, wordColorMatchers, showSubtitleTranslation, audioPower, onLineSeek, canSeek = false, disableEntryMotion = false, renderStaticPassed = false, wholeLine = false, reducedMotion = false, mistEntryY, onSentenceMeasure }) => {
     const initialOffset = entry.offset >= 0 ? 34 : -34;
     const exitOffset = entry.status === 'passed' || entry.offset < 0 ? -38 : 38;
     // The active lyric must never be truncated, so its box is sized by its own wrapped
     // content instead of the pre-measured height, and it carries no truncation fade.
     // Context lines keep the fixed two-line box that keeps the rail compact.
     const isActiveLine = entry.status === 'active';
+    const isWaiting = wholeLine && entry.status === 'waiting';
+    const lineCanSeek = canSeek && !isWaiting;
     const textMask = isActiveLine
         ? undefined
         : getClippedTextMask(
@@ -679,7 +710,7 @@ const MonetRailLine: React.FC<{
     const textMaskStyle = composeLineMasks(textMask, textEdgeMask);
     const translationMask = getLineMask(entry.layout.isTranslationClipped, Math.max(translationFontPx * 0.65, 10));
     const handleSeek = (event: React.MouseEvent | React.KeyboardEvent) => {
-        if (!canSeek) {
+        if (!lineCanSeek) {
             return;
         }
 
@@ -693,17 +724,27 @@ const MonetRailLine: React.FC<{
 
     return (
         <motion.div
-            role={canSeek ? 'button' : undefined}
-            tabIndex={canSeek ? 0 : undefined}
-            onClick={canSeek ? handleClickSeek : undefined}
-            onKeyDown={canSeek ? (event) => {
+            data-monet-line={entry.index}
+            data-dialogue-slot={wholeLine ? entry.index : undefined}
+            data-dialogue-line={wholeLine && !isWaiting ? entry.index : undefined}
+            data-dialogue-active={wholeLine && !isWaiting ? entry.status === 'active' : undefined}
+            data-start-time={wholeLine && !isWaiting ? entry.line.startTime : undefined}
+            data-text-rows={wholeLine && !isWaiting ? entry.layout.textLineCount : undefined}
+            aria-hidden={isWaiting ? true : undefined}
+            aria-disabled={wholeLine && !lineCanSeek ? true : undefined}
+            role={lineCanSeek ? 'button' : undefined}
+            tabIndex={lineCanSeek ? 0 : undefined}
+            onClick={lineCanSeek ? handleClickSeek : undefined}
+            onKeyDown={lineCanSeek ? (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     handleSeek(event);
                 }
             } : undefined}
-            className={`absolute top-0 min-w-0 will-change-transform ${canSeek ? 'cursor-pointer' : ''}`}
-            initial={disableEntryMotion ? false : {
+            className={`absolute top-0 min-w-0 will-change-transform ${lineCanSeek ? 'cursor-pointer' : ''}`}
+            initial={disableEntryMotion || reducedMotion ? false : mistEntryY !== undefined ? {
+                opacity: 0, y: mistEntryY, scale: entry.tone.scale, filter: `blur(${entry.tone.blurPx}px)`,
+            } : wholeLine ? false : {
                 opacity: 0,
                 y: entry.y + initialOffset,
                 scale: entry.tone.scale * 0.98,
@@ -722,7 +763,7 @@ const MonetRailLine: React.FC<{
                 filter: 'blur(6px)',
                 transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
             }}
-            transition={MONET_SCROLL_TRANSITION}
+            transition={reducedMotion ? { duration: 0 } : MONET_SCROLL_TRANSITION}
             style={{
                 left: `${glowBufferPx}px`,
                 right: `${glowBufferPx}px`,
@@ -772,10 +813,17 @@ const MonetRailLine: React.FC<{
                         : 'none',
                 }}
             >
-                <MonetTimedTokenSpan
+                {wholeLine ? <DialogueMistReveal currentTime={currentTime} start={entry.line.startTime} end={entry.line.endTime}
+                    pending={isWaiting} reservedHeight={entry.layout.textContentHeightPx} seed={entry.index}
+                    theme={theme} disabled={reducedMotion || disableEntryMotion || entry.status === 'passed'}>
+                    {!isWaiting && <MonetSentenceText line={entry.line} currentTime={currentTime} theme={theme} fontPx={lyricFontPx} reducedMotion={reducedMotion}
+                    glowIntensity={glowIntensity}
+                    lineHeightPx={entry.layout.lineHeightPx} measureKey={entry.measureKey} onMeasure={onSentenceMeasure} fontsEpoch={fontsEpoch} />}
+                </DialogueMistReveal> : <MonetTimedTokenSpan
                     entry={entry}
                     currentTime={currentTime}
                     accentColor={colorWithAlpha(theme.primaryColor, 0.98)}
+                    glowIntensity={glowIntensity}
                     fontPx={lyricFontPx}
                     fontStack={fontStack}
                     fontsEpoch={fontsEpoch}
@@ -784,7 +832,7 @@ const MonetRailLine: React.FC<{
                     chorusAccentColor={theme.accentColor}
                     audioPower={audioPower}
                     renderStaticPassed={renderStaticPassed}
-                />
+                />}
             </div>
             {showSubtitleTranslation && entry.status === 'active' && entry.line.translation ? (
                 <motion.div
@@ -836,15 +884,28 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
     subtitleTheme,
     keywordColoringEnabled,
     emptyText,
+    glowIntensity = 1,
     showSubtitleTranslation = true,
     audioPower,
     audioBands,
     onLyricLineSeek,
     seekDisabled = false,
     layoutScale = 1,
+    sentencePlayback,
 }) => {
+    const reducedMotion = useReducedMotionFor('uiMicroMotion');
     const railRef = useRef<HTMLDivElement | null>(null);
     const layoutCacheRef = useRef<MonetLayoutCache>(new Map());
+    const sentenceRowsRef = useRef(new Map<string, number>());
+    const [sentenceMeasureRevision, setSentenceMeasureRevision] = useState(0);
+    const handleSentenceMeasure = useCallback((key: string, rows: number) => {
+        if (sentenceRowsRef.current.get(key) === rows) return;
+        trimOldestCacheEntry(sentenceRowsRef.current, MONET_LAYOUT_CACHE_LIMIT);
+        sentenceRowsRef.current.set(key, rows);
+        if (layoutCacheRef.current.get(key)?.textLineCount === rows) return;
+        layoutCacheRef.current.delete(key);
+        setSentenceMeasureRevision(revision => revision + 1);
+    }, []);
     const manualScrollResetRef = useRef<number | null>(null);
     const wheelAccumulatorRef = useRef(0);
     const wheelDirectionRef = useRef(0);
@@ -868,12 +929,16 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
     const translationFontWeight = resolveThemeFontWeight(subtitleTheme ?? theme, 500);
 
     const visibleEntries = useMemo(
-        () => manualScrollAnchorIndex === null
-            ? entries
-            : buildScrollableRailEntries(lines, manualScrollAnchorIndex, currentLineIndex),
-        [currentLineIndex, entries, lines, manualScrollAnchorIndex],
+        () => {
+            if (manualScrollAnchorIndex === null) return sentencePlayback
+                ? retainDialogueActiveEntries(entries, lines, sentencePlayback.activeLineIndices, sentencePlayback.startedCount) : entries;
+            return buildScrollableRailEntries(sentencePlayback ? lines.slice(0, sentencePlayback.startedCount) : lines, manualScrollAnchorIndex, currentLineIndex)
+                .map(entry => sentencePlayback ? { ...entry, status: sentencePlayback.activeLineIndices.has(entry.index) ? 'active' as const : 'passed' as const } : entry);
+        },
+        [currentLineIndex, entries, lines, manualScrollAnchorIndex, sentencePlayback],
     );
     const isManualScrolling = manualScrollAnchorIndex !== null;
+    const historyLength = sentencePlayback?.startedCount ?? lines.length;
 
     const positionedEntries = useMemo(
         () => {
@@ -884,6 +949,7 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                 handledFontsEpochRef.current = fontsEpoch;
                 clearMonetMeasurementCaches();
                 layoutCacheRef.current.clear();
+                sentenceRowsRef.current.clear();
             }
 
             return buildPositionedEntries(
@@ -900,9 +966,12 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                 glowBufferPx,
                 showSubtitleTranslation,
                 layoutCacheRef.current,
+                Boolean(sentencePlayback),
+                sentenceRowsRef.current,
+                Boolean(sentencePlayback) && !isManualScrolling,
             );
         },
-        [visibleEntries, railSize, theme, lyricFontPx, inactiveFontPx, translationFontPx, fontStack, translationFontStack, lyricFontWeight, translationFontWeight, glowBufferPx, showSubtitleTranslation, fontsEpoch],
+        [visibleEntries, railSize, theme, lyricFontPx, inactiveFontPx, translationFontPx, fontStack, translationFontStack, lyricFontWeight, translationFontWeight, glowBufferPx, showSubtitleTranslation, fontsEpoch, sentencePlayback, sentenceMeasureRevision, isManualScrolling],
     );
     const wordColorMatchers = useMemo(
         () => prepareWordColorMatchers(theme.wordColors, keywordColoringEnabled),
@@ -933,19 +1002,19 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
     }, []);
 
     const moveManualScrollAnchor = useCallback((steps: number) => {
-        if (lines.length === 0) {
+        if (historyLength === 0) {
             return;
         }
 
         setManualScrollAnchorIndex(current => {
             const baseIndex = current ?? getFallbackAnchorIndex();
-            return Math.round(clamp(baseIndex + steps, 0, lines.length - 1));
+            return Math.round(clamp(baseIndex + steps, 0, historyLength - 1));
         });
         scheduleManualScrollReset();
-    }, [getFallbackAnchorIndex, lines.length, scheduleManualScrollReset]);
+    }, [getFallbackAnchorIndex, historyLength, scheduleManualScrollReset]);
 
     const handleRailWheel = useCallback((event: WheelEvent) => {
-        if (lines.length === 0) {
+        if (historyLength === 0) {
             return;
         }
 
@@ -966,10 +1035,10 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
         } else {
             scheduleManualScrollReset();
         }
-    }, [lines.length, moveManualScrollAnchor, scheduleManualScrollReset]);
+    }, [historyLength, moveManualScrollAnchor, scheduleManualScrollReset]);
 
     const handleRailTouchStart = useCallback((event: TouchEvent) => {
-        if (lines.length === 0) {
+        if (historyLength === 0) {
             return;
         }
 
@@ -979,7 +1048,7 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
         touchDirectionRef.current = 0;
         setManualScrollAnchorIndex(getFallbackAnchorIndex());
         scheduleManualScrollReset();
-    }, [getFallbackAnchorIndex, lines.length, scheduleManualScrollReset]);
+    }, [getFallbackAnchorIndex, historyLength, scheduleManualScrollReset]);
 
     const handleRailTouchMove = useCallback((event: TouchEvent) => {
         if (lines.length === 0 || touchLastYRef.current === null) {
@@ -1054,9 +1123,12 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
         };
     }, []);
 
+    // 句级模式在倒带时立即移除后文，不让 AnimatePresence 的离场保留未来台词。
+    const RailPresence = sentencePlayback ? React.Fragment : AnimatePresence;
     return (
         <div
             ref={railRef}
+            data-testid={sentencePlayback ? 'dialogue-scroll' : 'monet-scroll'}
             className="relative select-none overflow-hidden"
             style={{
                 height: `clamp(280px, 52vh, ${railMaxHeightPx}px)`,
@@ -1072,8 +1144,9 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                 maskImage: 'linear-gradient(to bottom, transparent 0%, black 11%, black 88%, transparent 100%)',
             }}
         >
+            {sentencePlayback?.startedCount === 0 && lines.length > 0 && <span className="sr-only" role="status">{emptyText}</span>}
             {positionedEntries.length > 0 ? (
-                <AnimatePresence initial={false}>
+                <RailPresence {...(sentencePlayback ? {} : { initial: false })}>
                     {positionedEntries.map(entry => (
                         <MonetRailLine
                             key={entry.key}
@@ -1081,6 +1154,7 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                             currentTime={currentTime}
                             theme={theme}
                             lyricFontPx={lyricFontPx}
+                            glowIntensity={glowIntensity}
                             translationFontPx={translationFontPx}
                             fontStack={fontStack}
                             translationFontStack={translationFontStack}
@@ -1095,9 +1169,14 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                             canSeek={canSeek}
                             disableEntryMotion={isManualScrolling}
                             renderStaticPassed={isManualScrolling && entry.index !== currentLineIndex}
+                            wholeLine={Boolean(sentencePlayback)}
+                            reducedMotion={reducedMotion}
+                            mistEntryY={sentencePlayback && entry.status === 'waiting' && entry.index === sentencePlayback.startedCount + 1
+                                ? Math.max(entry.y + entry.scaledHeight, railSize.height || MONET_RAIL_HEIGHT_FALLBACK_PX) : undefined}
+                            onSentenceMeasure={handleSentenceMeasure}
                         />
                     ))}
-                </AnimatePresence>
+                </RailPresence>
             ) : emptyText ? (
                 <div
                     className="absolute left-0 top-1/2 -translate-y-1/2"

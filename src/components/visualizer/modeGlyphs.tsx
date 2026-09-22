@@ -23,6 +23,8 @@ const FALLBACK_GLYPH = (
 );
 
 const VISUALIZER_MODE_GLYPHS: Record<string, React.ReactNode> = {
+    // 对白：历史字幕在上，当前整句在下。
+    dialogue: <><path d="M4 6h12M4 10h9" opacity="0.35" /><path d="M4 15h16M4 19h11" /></>,
     // 静止：三行静态歌词
     still: (
         <>

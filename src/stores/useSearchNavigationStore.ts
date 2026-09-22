@@ -71,7 +71,7 @@ export const resolveSearchSource = (tab: HomeViewTab | SearchSource): SearchSour
     if (tab === 'local' || tab === 'navidrome') {
         return tab;
     }
-    if (tab !== 'playlist' && tab !== 'albums' && tab !== 'radio') return tab as OnlineProviderId;
+    if (tab !== 'playlist' && tab !== 'albums' && tab !== 'radio' && tab !== 'history') return tab as OnlineProviderId;
     return 'netease';
 };
 
@@ -177,7 +177,7 @@ const getInitialHomeViewTab = (): HomeViewTab => {
         return 'playlist';
     }
     const savedTab = localStorage.getItem(LAST_HOME_VIEW_TAB_KEY);
-    return savedTab === 'playlist' || savedTab === 'local' || savedTab === 'albums' || savedTab === 'navidrome' || savedTab === 'radio'
+    return savedTab === 'playlist' || savedTab === 'local' || savedTab === 'albums' || savedTab === 'navidrome' || savedTab === 'radio' || savedTab === 'history'
         ? savedTab
         : 'playlist';
 };

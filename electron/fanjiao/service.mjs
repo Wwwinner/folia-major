@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createFanjiaoClient } from './client.mjs';
 import { albumDto, episodeDto, requireId } from './catalog.mjs';
-import { createPlaybackSession, getEpisodeLyrics } from './session.mjs';
+import { createPlaybackSession, getEpisodeLyrics, readMediaAsset } from './session.mjs';
+import { createFanjiaoDiscovery } from './discovery.mjs';
+import { createEpisodeInfoCache } from './episodeInfoCache.mjs';
 
 // Electron 饭角服务：白名单 IPC 操作、私有凭据读取，以及不可预测的本地 HLS 会话地址。
 export const FANJIAO_SCHEME = 'folia-hls';
@@ -17,8 +19,10 @@ export function readSigningSecret({ appPath, userData, isDev }) {
     try { return readFileSync(filename, 'utf8').trim(); } catch { return ''; }
 }
 
-export function createFanjiaoService({ secret, now = Date.now, client: injectedClient } = {}) {
-    const client = injectedClient || (secret ? createFanjiaoClient(secret) : null);
+export function createFanjiaoService({ secret, now = Date.now, client: injectedClient, mediaTransport } = {}) {
+    const upstreamClient = injectedClient || (secret ? createFanjiaoClient(secret) : null);
+    const client = upstreamClient ? createEpisodeInfoCache(upstreamClient, { now }) : null;
+    const readAsset = (url, signal, maxBytes) => readMediaAsset(url, signal, maxBytes, mediaTransport?.fetch);
     const sessions = new Map();
     const albums = new Map();
     let disposed = false;
@@ -27,6 +31,7 @@ export function createFanjiaoService({ secret, now = Date.now, client: injectedC
         if (disposed || !client) throw Object.assign(new Error('饭角尚未配置签名凭据'), { code: 'unavailable' });
         return client;
     };
+    const discovery = createFanjiaoDiscovery(requireClient, now);
     const touch = (token, entry) => {
         entry.touchedAt = now();
         sessions.delete(token);
@@ -60,6 +65,10 @@ export function createFanjiaoService({ secret, now = Date.now, client: injectedC
         requireClient();
         if (!params || typeof params !== 'object' || Array.isArray(params)) throw new Error('Invalid Fanjiao request');
         switch (operation) {
+            case 'homeSections':
+            case 'sectionAlbums':
+            case 'browseFilters':
+            case 'browseAlbums': return discovery.request(operation, params);
             case 'searchAlbums': {
                 const query = typeof params.query === 'string' ? params.query.trim() : '';
                 const limit = params.limit ?? 30;
@@ -85,13 +94,13 @@ export function createFanjiaoService({ secret, now = Date.now, client: injectedC
                 const raw = await client.get('/walkman/api/audio/info', { audio_id: requireId(params.id) });
                 return episodeDto(raw, await getAlbum(requireId(raw.album_id)));
             }
-            case 'lyrics': return getEpisodeLyrics(client, requireId(params.id));
+            case 'lyrics': return getEpisodeLyrics(client, requireId(params.id), readAsset);
             case 'audioSource': {
                 const id = requireId(params.id);
                 const definition = params.quality === 'standard' ? 'FD' : 'HQ';
                 prune();
                 const token = randomBytes(24).toString('hex');
-                const session = createPlaybackSession(client, id, { definition, now });
+                const session = createPlaybackSession(client, id, { definition, now, readAsset });
                 const entry = { session, audioId: id, touchedAt: now() };
                 sessions.set(token, entry);
                 prune();
@@ -117,7 +126,14 @@ export function createFanjiaoService({ secret, now = Date.now, client: injectedC
             const body = isManifest ? await entry.session.playlist() : await entry.session.segment(Number(match[4]));
             return new Response(body, { headers: { 'Content-Type': isManifest ? 'application/vnd.apple.mpegurl' : 'video/mp2t',
                 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
-        } catch { return new Response(null, { status: 502 }); }
+        } catch (error) {
+            // 只记录可定位的分片编号与错误类别，不输出上游地址、签名或原始错误对象。
+            const kind = ['TimeoutError', 'AbortError', 'TypeError'].includes(error?.name) ? error.name : 'MediaError';
+            if (!disposed) console.warn('[Fanjiao stream] Resource failed', entry.audioId,
+                match[4] === undefined ? 'manifest' : `segment:${match[4]}`, kind,
+                Number.isInteger(error?.status) ? error.status : 0);
+            return new Response(null, { status: 502 });
+        }
     }
     return { status, request, handleProtocol, dispose: () => {
         disposed = true;
@@ -125,5 +141,8 @@ export function createFanjiaoService({ secret, now = Date.now, client: injectedC
         for (const { session } of sessions.values()) session.dispose();
         sessions.clear();
         albums.clear();
+        discovery.clear();
+        client?.clear();
+        mediaTransport?.dispose();
     } };
 }

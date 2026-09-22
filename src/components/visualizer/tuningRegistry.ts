@@ -66,8 +66,9 @@ export const applyVisualizerTuning = (
     props: VisualizerSharedProps,
     bundle?: VisualizerTuningBundle,
 ): VisualizerSharedProps => {
-    const adapter = adaptersByMode.get(mode as VisualizerTuningMode);
-    const tuning = bundle?.[mode as VisualizerTuningMode];
+    const tuningMode = mode === 'dialogue' ? 'monet' : mode;
+    const adapter = adaptersByMode.get(tuningMode as VisualizerTuningMode);
+    const tuning = bundle?.[tuningMode as VisualizerTuningMode];
     return adapter && tuning ? adapter.apply(props, tuning as never) : props;
 };
 

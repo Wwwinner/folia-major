@@ -24,6 +24,8 @@ import { useAutomixSettingsStore } from '../stores/useAutomixSettingsStore';
 import { useAudioSettingsStore } from '../stores/useAudioSettingsStore';
 import { useEpisodePlaybackStore } from '../stores/useEpisodePlaybackStore';
 import { resolveQueueNeighborIndex } from '../utils/episodePlayback';
+import { prefetchSegmentedAudioStart } from './segmentedAudioPrefetch';
+import { waitForEpisodePrefetchReadiness } from './episodePrefetchReadiness';
 
 // Prefetch configuration
 //
@@ -166,7 +168,8 @@ const prefetchSong = async (
     song: SongResult,
     audioQuality: AudioQualityPreference,
     signal: AbortSignal,
-    userId?: MediaId | null
+    userId?: MediaId | null,
+    playingSong?: SongResult,
 ): Promise<void> => {
     if (signal.aborted) return;
 
@@ -232,6 +235,12 @@ const prefetchSong = async (
                         ? { ...data.replayGain, ...audioSource.replayGain }
                         : data.replayGain;
                     console.log(`[Prefetch] Got audio URL for: ${song.name} (quality: ${audioQuality})`);
+                    if (signal.aborted) return;
+                    // 先公开同一会话 URL：用户此时点播也能合并进行中的首片下载。
+                    touchPrefetchCacheEntry(songKey, data);
+                    if (playingSong && !await waitForEpisodePrefetchReadiness(playingSong, signal)) return;
+                    await prefetchSegmentedAudioStart(url, signal);
+                    if (signal.aborted) return;
                 }
             }
         } catch (e) {
@@ -484,7 +493,8 @@ export const prefetchNearbySongs = async (
             requestIdleCallback(
                 async () => {
                     if (signal.aborted) return;
-                    await prefetchSong(song, audioQuality, signal, userId);
+                    if (!await waitForEpisodePrefetchReadiness(currentSong, signal)) return;
+                    await prefetchSong(song, audioQuality, signal, userId, currentSong);
                     prefetchWithIdle(songs, index + 1);
                 },
                 { timeout: 5000 }
@@ -493,7 +503,8 @@ export const prefetchNearbySongs = async (
             // Fallback for browsers without requestIdleCallback
             setTimeout(async () => {
                 if (signal.aborted) return;
-                await prefetchSong(song, audioQuality, signal, userId);
+                if (!await waitForEpisodePrefetchReadiness(currentSong, signal)) return;
+                await prefetchSong(song, audioQuality, signal, userId, currentSong);
                 prefetchWithIdle(songs, index + 1);
             }, 100);
         }

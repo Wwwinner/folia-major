@@ -2,6 +2,7 @@ import { resolveVod } from './vod.mjs';
 import { decryptTransportStream } from './transportStream.mjs';
 import { parseFanjiaoSubtitles } from './subtitles.mjs';
 import { hasEpisodeMediaAuthorization, requireId } from './catalog.mjs';
+import { setTimeout as delay } from 'node:timers/promises';
 
 // 按需处理 HLS 分片；会话内共享刷新与下载，有限缓存，销毁时取消未完成的请求。
 const trustedRoots = ['fanjiao.co', 'fanjiao.cn', 'rela.me', 'aliyuncs.com'];
@@ -14,9 +15,25 @@ export function trustedMediaUrl(value) {
     return url;
 }
 
-export async function readMediaAsset(value, signal, maxBytes = 16 * 1024 * 1024) {
-    const response = await fetch(trustedMediaUrl(value), { redirect: 'error',
-        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) });
+export async function readMediaAsset(value, signal, maxBytes = 16 * 1024 * 1024, fetchMedia = fetch) {
+    const url = trustedMediaUrl(value);
+    // 高音质分片约为标准音质的四倍；完整下载预算与 renderer 的 65 秒等待配套。
+    const timeout = AbortSignal.timeout(url.pathname.endsWith('.ts') ? 60000 : 20000);
+    const deadline = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    for (let attempt = 0; ; attempt++) {
+        try { return await readMediaAttempt(url, deadline, maxBytes, fetchMedia); }
+        catch (error) {
+            const transient = error instanceof TypeError || [408, 429, 500, 502, 503, 504].includes(error.status)
+                || ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error.code);
+            if (deadline.aborted || attempt >= 2 || !transient) throw error;
+            // 所有重试共用原始截止时间，不把一次下载等待重复放大。
+            await delay(250 * (attempt + 1), undefined, { signal: deadline });
+        }
+    }
+}
+
+async function readMediaAttempt(url, signal, maxBytes, fetchMedia) {
+    const response = await fetchMedia(url, { redirect: 'error', signal });
     if (!response.ok) {
         await response.body?.cancel();
         throw Object.assign(new Error(`Media HTTP ${response.status}`), { status: response.status });
@@ -59,7 +76,7 @@ export function createPlaybackSession(client, audioId, { definition = 'FD', now 
         assertAlive();
         if (pending) return pending;
         pending = (async () => {
-            const payload = await client.get('/walkman/api/audio/info', { audio_id: audioId }, controller.signal);
+            const payload = await client.get('/walkman/api/audio/info', { audio_id: audioId }, controller.signal, { fresh: true });
             if (String(payload.audio_id) !== String(audioId)) throw new Error('Unexpected Fanjiao episode');
             if (!hasEpisodeMediaAuthorization(payload)) throw Object.assign(new Error('饭角未返回这集的播放授权，暂时无法播放'), { code: 'not-playable' });
             const media = await resolveMedia(payload, definition, controller.signal);
@@ -125,10 +142,10 @@ export function createPlaybackSession(client, audioId, { definition = 'FD', now 
     };
 }
 
-export async function getEpisodeLyrics(client, audioId) {
+export async function getEpisodeLyrics(client, audioId, readAsset = readMediaAsset) {
     const payload = await client.get('/walkman/api/audio/info', { audio_id: requireId(audioId) });
     if (!payload.subtitle) return { lyrics: null, isPureMusic: false };
-    const bytes = await readMediaAsset(payload.subtitle, undefined, 4 * 1024 * 1024);
+    const bytes = await readAsset(payload.subtitle, undefined, 4 * 1024 * 1024);
     return { lyrics: parseFanjiaoSubtitles(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, '')), audioId).lyrics,
         isPureMusic: false };
 }

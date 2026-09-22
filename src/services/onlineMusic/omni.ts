@@ -20,6 +20,9 @@ import type {
     ProviderCatalogEntityKind,
     QrLoginMethod,
     QrLoginState,
+    HomeDiscoverySection,
+    CollectionBrowseFilter,
+    CollectionBrowseQuery,
 } from '../../types/onlineMusic';
 import { resolveProviderLyricsChorus } from '../../utils/lyrics/chorusResolver';
 import { OnlineProviderError } from '../../types/onlineMusic';
@@ -374,6 +377,25 @@ export const omni = {
 
     normalizeCachedCollection(providerId: OmniProviderId, raw: unknown, type?: string): OmniCollection | null {
         return requireOnlineMusicProvider(providerId).normalizeCollection?.(raw, type) ?? null;
+    },
+
+    async getHomeSections(page: PageInput = { limit: 20, offset: 0 }): Promise<OmniPage<HomeDiscoverySection>> {
+        return withActiveProvider(provider => provider.discovery?.getHomeSections(page.limit, page.offset)
+            ?? unsupported(provider.id, 'publicDiscovery'));
+    },
+
+    async getCollectionBrowseFilters(): Promise<CollectionBrowseFilter[]> {
+        return withActiveProvider(provider => provider.discovery?.getBrowseFilters() ?? unsupported(provider.id, 'publicDiscovery'));
+    },
+
+    async getDiscoverySectionCollections(id: string, page: PageInput = { limit: 20, offset: 0 }): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(provider => provider.discovery?.getSectionCollections?.(id, page.limit, page.offset)
+            ?? unsupported(provider.id, 'discoverySection'));
+    },
+
+    async browseCollections(query: CollectionBrowseQuery, page: PageInput = { limit: 24, offset: 0 }): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(provider => provider.discovery?.browseCollections(query, page.limit, page.offset)
+            ?? unsupported(provider.id, 'publicDiscovery'));
     },
 
     async getHomeFeed(limit = 35): Promise<{
