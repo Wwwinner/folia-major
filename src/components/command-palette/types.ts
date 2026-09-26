@@ -202,6 +202,7 @@ export type CommandPaletteSettingsContext = {
     /** Which surface pressing play opens; see usePlaybackEntryViewStore. */
     playbackEntryView: PlaybackEntryView;
     setPlaybackEntryView: (view: PlaybackEntryView) => void;
+    toggleRememberHomeCardPosition: () => void;
     startPlayerBottomBarPositioning: () => void;
     canStartPlayerBottomBarPositioning: boolean;
     toggleAlwaysShowPlayerBackButton: () => void;
@@ -225,6 +226,8 @@ export type CommandPaletteSettingsContext = {
     setLatticePosterTintIntensity: (intensity: number) => void;
     toggleAlwaysShowTrackSwitchButtons: () => void;
     toggleAlwaysShowMainWindowTitlebar: () => void;
+    toggleNativeMacFullscreenButton: () => void;
+    toggleAutoHideCursorWithPlayerChrome: () => void;
     /** Lab switch: whether the restored session starts playing by itself on launch. */
     toggleAutoPlayOnLaunch: () => void;
     toggleTranscodeFallback: () => void;

@@ -284,6 +284,8 @@ export interface OnlineAuthProvider {
 export interface OnlineLibraryProvider {
     getUserPlaylists(userId: MediaId, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
     getLikedSongIds?(userId: MediaId): Promise<MediaId[]>;
+    /** Full liked-track records, used when a provider needs more than the song id (e.g. KuGou fileId). */
+    getLikedSongs?(userId: MediaId): Promise<UnifiedSong[]>;
     getUserAlbums?(userId: MediaId, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
     getCloudCollection?(user?: ProviderUser): Promise<ProviderCollection | null>;
 }
@@ -352,7 +354,11 @@ export interface OnlineDiscoveryProvider {
 
 export interface OnlineMutationProvider {
     canAddToPlaylist?(playlist: ProviderCollection): boolean;
-    likeSong?(song: MediaId | SongResult, liked: boolean): Promise<void>;
+    likeSong?(
+        song: MediaId | SongResult,
+        liked: boolean,
+        context?: { likedFileId?: MediaId },
+    ): Promise<void>;
     updatePlaylistTracks?(
         operation: 'add' | 'del',
         playlist: MediaId | ProviderCollection,

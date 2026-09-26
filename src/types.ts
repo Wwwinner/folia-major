@@ -1164,6 +1164,7 @@ export interface SearchResponse {
 // Local Music Types
 
 export type LocalLyricsPriority = 'local' | 'online';
+export type ActiveLocalLyricsSource = 'local' | 'embedded' | 'online';
 
 export interface LocalSong {
   id: string; // UUID for local file
