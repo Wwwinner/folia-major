@@ -36,6 +36,8 @@ const { resolveLinuxPasswordStore } = require('./linuxPasswordStore.cjs');
 const { createTranscodeService } = require('./transcode/service.cjs');
 const { TRANSCODE_PROTOCOL_SCHEME } = require('./transcode/protocol.cjs');
 const { createFanjiaoBridge, FANJIAO_SCHEME, isTrustedFanjiaoPage } = require('./fanjiao/bridge.cjs');
+const { NETWORK_PROXY_KEY, loadProxySettings, normalizeProxySettings, toChromiumProxyConfig } = require('./proxySettings.cjs');
+const { createDesktopLyricsController } = require('./desktopLyricsWindow.cjs');
 const { sanitizeDualTheme: sanitizeGeneratedDualTheme } = require('../shared/themeSanitizer.cjs');
 const {
   buildOpenAICompatibleRequestBody,
@@ -178,6 +180,9 @@ if (process.platform === 'darwin' && process.arch === 'x64') {
 }
 
 const store = new Store({ projectName: 'Folia' });
+const startupProxySettings = loadProxySettings(store, {
+  appPath: app.getAppPath(), userData: app.getPath('userData'), isDev: !app.isPackaged,
+});
 const transcodeService = createTranscodeService({
   app,
   protocol,
@@ -1631,6 +1636,8 @@ const mainLocale = {
     trayAlwaysOnTop: '窗口置顶',
     trayHideTaskbar: '隐藏任务栏图标',
     trayDesktopLyricMode: '桌面歌词',
+    trayDesktopLyricLock: '锁定桌面字幕（鼠标穿透）',
+    trayDesktopLyricReset: '重置桌面字幕位置',
     trayToggleWallpaperMode: '壁纸模式',
     trayResetWindow: '重置窗口',
     trayQuit: '退出',
@@ -1652,6 +1659,8 @@ const mainLocale = {
     trayAlwaysOnTop: 'Always on Top',
     trayHideTaskbar: 'Hide Taskbar Icon',
     trayDesktopLyricMode: 'Desktop Lyrics',
+    trayDesktopLyricLock: 'Lock desktop lyrics (click-through)',
+    trayDesktopLyricReset: 'Reset desktop lyrics position',
     trayToggleWallpaperMode: 'Wallpaper Mode',
     trayResetWindow: 'Reset Window',
     trayQuit: 'Quit',
@@ -1673,6 +1682,8 @@ const mainLocale = {
     trayAlwaysOnTop: 'Selalu di Atas',
     trayHideTaskbar: 'Sembunyikan Ikon Taskbar',
     trayDesktopLyricMode: 'Lirik Desktop',
+    trayDesktopLyricLock: 'Kunci lirik desktop (tembus klik)',
+    trayDesktopLyricReset: 'Atur ulang posisi lirik desktop',
     trayToggleWallpaperMode: 'Mode Wallpaper',
     trayResetWindow: 'Atur Ulang Jendela',
     trayQuit: 'Keluar',
@@ -1778,6 +1789,10 @@ let modSystem = null;
 let remoteControlWindow = null;
 let appTray = null;
 let latestRemoteControlSnapshot = null;
+const desktopLyrics = createDesktopLyricsController({ BrowserWindow, screen, ipcMain, store,
+  getMainWindow: () => mainWindow, getSnapshot: () => latestRemoteControlSnapshot, isDev: isElectronDevRuntime(),
+  onChange: () => { refreshTrayMenu(); broadcastPlaybackSyncBridgeStatus(); },
+});
 let obsBrowserSourceServer = null;
 let latestObsBrowserSourceConfig = null;
 let latestObsBrowserSourceClock = null;
@@ -1950,6 +1965,8 @@ function readStoredBoolean(settingKey, fallback = false) {
 function getPublicSettings() {
   return {
     ...store.store,
+    NETWORK_PROXY_SUPPORTED: true,
+    NETWORK_PROXY_RESTART_REQUIRED: JSON.stringify(store.get(NETWORK_PROXY_KEY)) !== JSON.stringify(startupProxySettings),
     [MINIMIZE_TO_TRAY_SETTING_KEY]: readStoredBoolean(MINIMIZE_TO_TRAY_SETTING_KEY, false),
     [HIDE_TASKBAR_ICON_SETTING_KEY]: readStoredBoolean(HIDE_TASKBAR_ICON_SETTING_KEY, false),
     [REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY]: readStoredBoolean(REMOTE_CONTROL_ALWAYS_ON_TOP_SETTING_KEY, true),
@@ -2073,6 +2090,7 @@ const analysisHost = createAnalysisHost({ app, ipcMain, getModelsDirs: getModels
 function buildPlaybackSyncBridgeStatus() {
   return {
     remoteControlOpen: Boolean(remoteControlWindow && !remoteControlWindow.isDestroyed()),
+    desktopLyricsOpen: desktopLyrics.state().enabled,
     discordPresenceEnabled: readStoredBoolean(DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY, false),
   };
 }
@@ -2449,13 +2467,10 @@ function setMainWindowAlwaysOnTop(enabled) {
 }
 
 function isDesktopLyricModeActive() {
-  return mainWindowClickThroughEnabled
-    && mainWindowAlwaysOnTop
-    && isTransparentPlayerBackgroundEnabled()
-    && mainWindowSkipTaskbarEnabled;
+  return desktopLyrics.state().enabled;
 }
 
-async function setDesktopLyricMode(enabled) {
+async function setMainWindowOverlayPreset(enabled) {
   const nextEnabled = Boolean(enabled);
   if (nextEnabled && isWallpaperModeEnabled()) {
     return false;
@@ -2476,33 +2491,7 @@ async function setDesktopLyricMode(enabled) {
 }
 
 async function resetMainWindowPresentation() {
-  return setDesktopLyricMode(false);
-}
-
-async function enableDesktopLyricsLeavingWallpaperMode() {
-  store.set(WALLPAPER_MODE_SETTING_KEY, false);
-  refreshTrayMenu();
-
-  if (process.platform === 'linux') {
-    mainWindowAlwaysOnTop = true;
-    mainWindowSkipTaskbarEnabled = true;
-    store.set(MAIN_WINDOW_ALWAYS_ON_TOP_SETTING_KEY, true);
-    store.set(HIDE_TASKBAR_ICON_SETTING_KEY, true);
-    store.set(TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY, true);
-    process.env.FOLIA_PENDING_DESKTOP_LYRIC = '1';
-    scheduleWallpaperModeRelaunch(false);
-    return;
-  }
-
-  wallpaperModeRelaunchGeneration += 1;
-  const generation = wallpaperModeRelaunchGeneration;
-  if (wallpaperModeRelaunchTimer) {
-    clearTimeout(wallpaperModeRelaunchTimer);
-    wallpaperModeRelaunchTimer = null;
-  }
-  await relaunchForWallpaperModeChange(false, generation);
-  await setDesktopLyricMode(true);
-  refreshTrayMenu();
+  return setMainWindowOverlayPreset(false);
 }
 
 function refreshTrayMenu() {
@@ -2553,15 +2542,16 @@ function refreshTrayMenu() {
       enabled: hasMainWindow,
       click: () => {
         const nextEnabled = !isDesktopLyricModeActive();
-        if (nextEnabled && isWallpaperModeEnabled()) {
-          void enableDesktopLyricsLeavingWallpaperMode();
-          return;
-        }
-        void setDesktopLyricMode(nextEnabled).then(() => {
-          refreshTrayMenu();
-        });
+        desktopLyrics.update({ enabled: nextEnabled });
       },
     },
+    {
+      label: locale.trayDesktopLyricLock,
+      type: 'checkbox', checked: desktopLyrics.state().locked, enabled: isDesktopLyricModeActive(),
+      click: () => desktopLyrics.update({ locked: !desktopLyrics.state().locked }),
+    },
+    { label: locale.trayDesktopLyricReset, enabled: isDesktopLyricModeActive(),
+      click: () => desktopLyrics.update({ resetPosition: true, locked: false }) },
     ...(isWallpaperModeSupportedPlatform() ? [{
       label: locale.trayToggleWallpaperMode,
       type: 'checkbox',
@@ -2690,11 +2680,8 @@ function acquireSingleInstanceLock() {
 }
 
 async function ensureSystemProxySession() {
-  const ses = session.defaultSession;
-  await ses.setProxy({ mode: 'system' });
-  await ses.forceReloadProxyConfig();
-  await ses.closeAllConnections();
-  return ses;
+  // 已在启动时应用通用代理设置；AI 请求不能重置它或中断其他播放连接。
+  return session.defaultSession;
 }
 
 function isFileSystemPermission(permission) {
@@ -3387,7 +3374,7 @@ async function checkForManualUpdateAvailability() {
     // Keep the startup check off the app's default session so refreshing proxy state cannot
     // interrupt playback, provider requests, or other live connections.
     const ses = session.fromPartition('folia-update-check');
-    await ses.setProxy({ mode: 'system' });
+    await ses.setProxy(toChromiumProxyConfig(startupProxySettings));
     await ses.forceReloadProxyConfig();
     const response = await ses.fetch(discovery.url, {
       headers: {
@@ -5079,6 +5066,7 @@ function createWindow(options = {}) {
       if (remoteControlWindow && !remoteControlWindow.isDestroyed()) {
         remoteControlWindow.close();
       }
+      desktopLyrics.close();
       refreshTrayMenu();
     }
   });
@@ -5222,6 +5210,7 @@ app.whenReady().then(async () => {
   }
 
   setupFileSystemAccessPermissionHandlers();
+  await session.defaultSession.setProxy(toChromiumProxyConfig(startupProxySettings));
   setupCorsBypassHandlers();
   localCoverAssetStore.registerProtocolHandler(protocol, electronNet);
   protocol.handle(FANJIAO_SCHEME, request => fanjiaoBridge.handleProtocol(request));
@@ -5286,12 +5275,11 @@ app.whenReady().then(async () => {
   }
   createWindow();
   focusMainWindow();
+  desktopLyrics.restore();
   if (process.env.FOLIA_PENDING_DESKTOP_LYRIC === '1') {
     delete process.env.FOLIA_PENDING_DESKTOP_LYRIC;
     if (!isWallpaperModeEnabled()) {
-      void setDesktopLyricMode(true).then(() => {
-        refreshTrayMenu();
-      });
+      desktopLyrics.update({ enabled: true });
     }
   }
   // Windows wallpaper mode: attach the helper once the window exists (startup with the setting
@@ -5446,6 +5434,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  desktopLyrics.dispose();
   fanjiaoBridge.dispose();
   transcodeService.dispose();
   isAppQuitting = true;
@@ -5534,6 +5523,13 @@ ipcMain.handle('set-app-locale', (event, localeKey) => {
 });
 
 ipcMain.handle('save-settings', (event, key, value) => {
+  if (key === NETWORK_PROXY_KEY) {
+    if (!isTrustedMainWindowContents(event.sender) || event.senderFrame !== event.sender.mainFrame) {
+      throw new Error('Untrusted settings request');
+    }
+    store.set(NETWORK_PROXY_KEY, normalizeProxySettings(value));
+    return getPublicSettings();
+  }
   if (key === 'DISCORD_RICH_PRESENCE_APPLICATION_ID') {
     return getPublicSettings();
   }
@@ -6407,6 +6403,7 @@ ipcMain.handle('remote-control-publish-snapshot', (event, snapshot) => {
   if (latestRemoteControlSnapshot) {
     sendRemoteControlSnapshot(latestRemoteControlSnapshot);
   }
+  desktopLyrics.publish(latestRemoteControlSnapshot);
   return true;
 });
 
@@ -6698,7 +6695,7 @@ ipcMain.handle('segment-lyrics', async (event, lines) => {
     const useSystemProxy = store.get('USE_SYSTEM_PROXY_FOR_AI') || false;
     const customFetch = (url, options) => fetchWithOptionalSystemProxy(url, options, useSystemProxy);
     console.log(`[segment-lyrics] segmenting ${sourceLines.length} lines`
-      + ` via ${store.get('AI_PROVIDER') || 'gemini'}${useSystemProxy ? ' (system proxy)' : ''}`);
+      + ` via ${store.get('AI_PROVIDER') || 'gemini'}${useSystemProxy ? ' (app proxy settings)' : ''}`);
 
     rawResponse = await runAiJsonCompletion({
       store,

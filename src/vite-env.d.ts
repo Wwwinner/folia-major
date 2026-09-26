@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { ModExportProgress, ModFfmpegStatus, ModLogEntry, ModRuntimeInfo, ModRuntimeSnapshot } from './mods/types';
+import type { DesktopLyricsBridge, DesktopLyricsPatch, DesktopLyricsState } from './types/desktopLyrics';
 
 declare global {
   const __COMMIT_HASH__: string;
@@ -11,6 +12,7 @@ declare global {
   const __DOCKER_STACK_VERSION__: string;
 
   interface Window {
+    desktopLyrics?: DesktopLyricsBridge;
     __FOLIA_RUNTIME_CONFIG__?: {
       aiProvider?: 'gemini' | 'openai';
     };
@@ -176,6 +178,7 @@ declare global {
 
   interface ElectronPlaybackSyncBridgeStatus {
     remoteControlOpen: boolean;
+    desktopLyricsOpen?: boolean;
     discordPresenceEnabled: boolean;
   }
 
@@ -663,6 +666,9 @@ declare global {
       platform: string;
       isLinuxX11: boolean;
       getSettings: () => Promise<any>;
+      getDesktopLyricsState?: () => Promise<DesktopLyricsState>;
+      updateDesktopLyrics?: (patch: DesktopLyricsPatch) => Promise<DesktopLyricsState>;
+      onDesktopLyricsState?: (callback: (state: DesktopLyricsState) => void) => () => void;
       saveSettings: (key: string, value: any) => Promise<any>;
       onWallpaperModeChanged?: (callback: (settings: Record<string, unknown>) => void) => () => void;
       onWallpaperTransparentRefused?: (callback: (settings: Record<string, unknown>) => void) => () => void;

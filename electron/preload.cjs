@@ -214,6 +214,13 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('thumbar-action', listener);
     },
     openRemoteControl: () => ipcRenderer.invoke('remote-control-open'),
+    getDesktopLyricsState: () => ipcRenderer.invoke('desktop-lyrics-state'),
+    updateDesktopLyrics: (patch) => ipcRenderer.invoke('desktop-lyrics-update', patch),
+    onDesktopLyricsState: (callback) => {
+        const listener = (_event, state) => callback(state);
+        ipcRenderer.on('desktop-lyrics-state-changed', listener);
+        return () => ipcRenderer.removeListener('desktop-lyrics-state-changed', listener);
+    },
     toggleRemoteControl: () => ipcRenderer.invoke('remote-control-toggle'),
     closeRemoteControl: () => ipcRenderer.invoke('remote-control-close'),
     getRemoteControlAlwaysOnTop: () => ipcRenderer.invoke('remote-control-get-always-on-top'),

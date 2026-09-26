@@ -89,6 +89,7 @@ const FIELD_GROUPS: Record<string, ImportGroup> = {
     tiltTuning: 'visualizer',
     dioramaTuning: 'visualizer',
     monetTuning: 'visualizer',
+    desktopLyricsAppearance: 'visualizer',
     pendoloTuning: 'visualizer',
     sonnetTuning: 'visualizer',
     temperaTuning: 'visualizer',
@@ -138,6 +139,7 @@ const FIELD_GROUPS: Record<string, ImportGroup> = {
 // exporter had none" rather than "clear yours". Offering them would promise a change that the apply
 // path skips. Kept in step with the guards in applyImportedConfig.
 const TRUTHY_GUARDED_FIELDS = new Set([
+    'desktopLyricsAppearance',
     'visualizerMode',
     'visualizerBackgroundMode',
     // applyImportedConfig only applies subtitleContentMode for the known enum values, all of which

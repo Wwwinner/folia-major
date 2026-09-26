@@ -55,7 +55,9 @@ export const SETTINGS_ANCHOR_DEFINITIONS = {
     desktopTrayBehavior: { section: 'desktop', labelKey: 'options.desktopTrayBehavior', electronOnly: true },
     wallpaperMode: { section: 'desktop', labelKey: 'options.wallpaperMode', electronOnly: true },
     updateCheck: { section: 'desktop', labelKey: 'options.updateCheck', electronOnly: true },
+    proxySettings: { section: 'desktop', labelKey: 'options.proxySettings', electronOnly: true },
     electronSettings: { section: 'desktop', labelKey: 'options.electronSettings', electronOnly: true },
+    desktopLyrics: { section: 'desktop', labelKey: 'desktopLyrics.title', electronOnly: true },
 
     // LabSettingsModal
     labPerformance: { section: 'lab', labelKey: 'options.labPerformanceSection' },

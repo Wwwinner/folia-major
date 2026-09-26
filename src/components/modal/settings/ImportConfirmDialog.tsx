@@ -79,6 +79,7 @@ const FIELD_LABEL_KEYS: Record<string, string> = {
     urlBackgroundSelectedId: 'options.importFieldUrlBackgroundSelected',
     visualizerTunings: 'options.importFieldVisualizerTunings',
     monetBackgroundTuning: 'options.importFieldMonetBackgroundTuning',
+    desktopLyricsAppearance: 'desktopLyrics.title',
     nomandBackgroundTuning: 'options.importFieldNomandBackgroundTuning',
     latentBackgroundTuning: 'options.importFieldLatentBackgroundTuning',
     // The card's three rows reuse the settings panel's own wording. The mode row borrows the

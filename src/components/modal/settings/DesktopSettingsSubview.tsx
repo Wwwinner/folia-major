@@ -21,6 +21,8 @@ import type { Theme } from '../../../types';
 import { CustomSelect } from '../../shared/CustomSelect';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
 import SettingsSectionHeading from './navigation/SettingsSectionHeading';
+import ProxySettingsSection from './ProxySettingsSection';
+import DesktopLyricsSettingsSection from './DesktopLyricsSettingsSection';
 
 // src/components/modal/settings/DesktopSettingsSubview.tsx
 // Desktop-only tray, update, and AI settings separated from the global settings modal.
@@ -46,6 +48,7 @@ export type DesktopSettingsChrome = {
     borderColor: string;
     isDaylight: boolean;
     isElectron: boolean;
+    utilityGhostButtonClass: string;
     settingsCardClass: string;
     settingsIconClass: string;
     successTextColor: string;
@@ -563,6 +566,9 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                 )}
             </SettingsAnchor>
 
+            <ProxySettingsSection borderColor={borderColor} settingsCardClass={settingsCardClass} isDaylight={isDaylight} theme={theme} />
+            <DesktopLyricsSettingsSection chrome={chrome} />
+
             <SettingsAnchor anchorId="electronSettings" label={t('options.electronSettings') || 'Desktop App Settings'} className="space-y-4">
                 <SettingsSectionHeading icon={Cpu} label={t('options.electronSettings') || 'Desktop App Settings'} />
 
@@ -707,10 +713,10 @@ const DesktopSettingsSubview: React.FC<DesktopSettingsSubviewProps> = ({
                     <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-4">
                         <div className="space-y-0.5 text-left">
                             <label className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                {t('options.useSystemProxyAI') || 'Use System Proxy for AI'}
+                                {t('options.useSystemProxyAI') || 'Use Proxy Settings for AI'}
                             </label>
                             <p className="text-xs opacity-50 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                                {t('options.useSystemProxyAIDesc') || 'Route strictly AI requests through system proxy.'}
+                                {t('options.useSystemProxyAIDesc') || 'Use the app proxy settings for AI requests.'}
                             </p>
                         </div>
                         {renderToggle(electronSettings.USE_SYSTEM_PROXY_FOR_AI, () => setElectronSettings({ ...electronSettings, USE_SYSTEM_PROXY_FOR_AI: !electronSettings.USE_SYSTEM_PROXY_FOR_AI }))}

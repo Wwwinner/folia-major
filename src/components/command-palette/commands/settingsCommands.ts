@@ -239,6 +239,7 @@ export const settingsCommands: CommandPaletteCommand[] = [
         { isAvailable: context => context?.settings.canAutoScanLocalLibrary() ?? true },
     ),
     createSettingsCommand('settings-desktop', 'Desktop settings', 'Open desktop app settings', ['desktop', 'electron', '桌面', '桌面端'], 'options', 'desktop', { platform: ['electron'] }),
+    createSettingsAnchorCommand('settings-proxy', 'Proxy settings', 'Configure the desktop network proxy', ['network proxy', 'clash', 'http', 'socks', '网络代理', '代理地址'], 'proxySettings', { platform: ['electron'] }),
     createSettingsCommand('settings-update-channel', 'Update channel', 'Choose the desktop app release channel', ['release channel', 'realeco', 'limo', 'cielo', '更新通道', '发布通道'], 'options', 'desktop', { platform: ['electron'] }),
     {
         id: 'desktop-toggle-voice-input-pause',
@@ -266,6 +267,15 @@ export const settingsCommands: CommandPaletteCommand[] = [
         },
     },
     createSettingsCommand('settings-wallpaper-mode', 'Wallpaper mode settings', 'Open wallpaper mode settings', ['wallpaper mode', 'desktop wallpaper', 'lyrics wallpaper', '壁纸模式', '桌面壁纸', '歌词壁纸'], 'options', 'desktop', { platform: ['linux', 'win', 'mac'] }),
+    createSettingsAnchorCommand('settings-desktop-lyrics', 'Desktop lyrics settings', 'Set up the independent subtitle window',
+        ['desktop lyrics', 'subtitle window', '桌面歌词', '桌面字幕'], 'desktopLyrics', { platform: ['electron'] }),
+    createToggleCommand('desktop-toggle-lyrics', 'settings', 'Toggle desktop lyrics', 'Show or close the independent subtitle window',
+        ['desktop lyrics', 'caption overlay', '桌面歌词', '桌面字幕'], context => context.settings.toggleDesktopLyrics(), { platform: ['electron'] }),
+    createToggleCommand('desktop-toggle-lyrics-lock', 'settings', 'Lock desktop lyrics', 'Toggle click-through for the subtitle window',
+        ['lock lyrics', 'click through', '锁定字幕', '鼠标穿透'], context => context.settings.toggleDesktopLyricsLock(),
+        { platform: ['electron'], isAvailable: context => context ? context.settings.canLockDesktopLyrics() : true }),
+    createToggleCommand('desktop-reset-lyrics-position', 'settings', 'Reset desktop lyrics position', 'Bring the subtitle window back onto the screen',
+        ['reset lyrics position', '重置字幕位置', '找回字幕'], context => context.settings.resetDesktopLyricsPosition(), { platform: ['electron'] }),
     {
         id: 'desktop-toggle-wallpaper-mode',
         platform: ['linux', 'win', 'mac'],
