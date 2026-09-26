@@ -110,6 +110,8 @@ const SliderControl: React.FC<SliderControlProps> = ({
         </div>
         <input
             type="range"
+            aria-label={label}
+            aria-valuetext={valueLabel}
             min={min}
             max={max}
             step={step}
@@ -147,6 +149,7 @@ export const MonetSettingsPanel: React.FC<VisualizerSettingsPanelProps> = ({
         showAudioVisualization: monetTuning.showAudioVisualization ?? DEFAULT_MONET_TUNING.showAudioVisualization,
         audioStyle: monetTuning.audioStyle ?? DEFAULT_MONET_TUNING.audioStyle,
         fontScale: clampValue(monetTuning.fontScale ?? DEFAULT_MONET_TUNING.fontScale, 0.7, 1.5, DEFAULT_MONET_TUNING.fontScale),
+        glowIntensity: clampValue(monetTuning.glowIntensity ?? DEFAULT_MONET_TUNING.glowIntensity, 0, 2, DEFAULT_MONET_TUNING.glowIntensity),
         portraitSource: monetTuning.portraitSource ?? DEFAULT_MONET_TUNING.portraitSource,
         portraitStyle: monetTuning.portraitStyle ?? DEFAULT_MONET_TUNING.portraitStyle ?? 'rectangular',
         showPortraitDragHanger: monetTuning.showPortraitDragHanger ?? DEFAULT_MONET_TUNING.showPortraitDragHanger,
@@ -230,6 +233,19 @@ export const MonetSettingsPanel: React.FC<VisualizerSettingsPanelProps> = ({
                     step={0.05}
                     value={resolvedTuning.fontScale}
                     onChange={(value) => onMonetTuningChange?.({ fontScale: value })}
+                    rangeInputClass={rangeInputClass}
+                    onSliderPointerDown={onSliderPointerDown}
+                    onSliderCommit={onSliderCommit}
+                />
+
+                <SliderControl
+                    label={t('options.monetGlowIntensity')}
+                    valueLabel={`${Math.round(resolvedTuning.glowIntensity * 100)}%`}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={resolvedTuning.glowIntensity}
+                    onChange={(value) => onMonetTuningChange?.({ glowIntensity: value })}
                     rangeInputClass={rangeInputClass}
                     onSliderPointerDown={onSliderPointerDown}
                     onSliderCommit={onSliderCommit}

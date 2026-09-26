@@ -17,6 +17,7 @@ export const BUILTIN_VISUALIZER_MODES = [
     'cappella',
     'claddagh',
     'classic',
+    'dialogue',
     'diorama',
     'fume',
     'monet',

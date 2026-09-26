@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useMotionValueEvent } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import type { OnlineProviderId, ProviderAccountSummary } from '../../../types/onlineMusic';
 import { playerBottomBarLiveOffset } from '../../../stores/motionSignals';
+import { omni } from '../../../services/onlineMusic/omni';
 import {
     PLAYER_BOTTOM_BAR_BASE_OFFSET_PX,
     resolvePlayerBottomComponentBottomPx,
@@ -25,6 +26,7 @@ const AVATAR_BADGE_BY_PROVIDER: Record<string, { label: string; iconUrl?: string
     netease: { label: '云', className: 'bg-red-600' },
     kugou: { label: 'K', className: 'bg-blue-600' },
     qq: { label: 'Q', className: 'bg-green-600' },
+    fanjiao: { label: '饭', className: 'bg-orange-600' },
 };
 
 const ProviderAvatar = ({ provider, className }: { provider: ProviderAccountSummary; className: string }) => {
@@ -200,6 +202,7 @@ const OnlineProviderSwitcher: React.FC<OnlineProviderSwitcherProps> = ({
                         </button>
                         {providers.map(provider => {
                             const active = provider.providerId === activeProviderId;
+                            const requiresAuth = omni.getProviderCapabilities(provider.providerId).auth;
                             const configured = provider.availability.configured;
                             return (
                                 <div
@@ -213,7 +216,7 @@ const OnlineProviderSwitcher: React.FC<OnlineProviderSwitcherProps> = ({
                                         disabled={!configured}
                                         onClick={() => {
                                             onSelect(provider);
-                                            if (provider.status === 'authenticated') setOpen(false);
+                                            if (provider.status === 'authenticated' || !requiresAuth) setOpen(false);
                                         }}
                                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                                     >
@@ -229,10 +232,10 @@ const OnlineProviderSwitcher: React.FC<OnlineProviderSwitcherProps> = ({
                                             <span className="mt-1 block truncate text-xs opacity-65">
                                                 {!configured
                                                     ? t('home.providerNotConfigured')
-                                                    : provider.user?.nickname || t('home.providerNotLoggedIn')}
+                                                    : provider.user?.nickname || t(requiresAuth ? 'home.providerNotLoggedIn' : 'home.publicCatalogAccess')}
                                             </span>
                                         </span>
-                                        {!active && provider.status !== 'authenticated' ? <LogIn size={16} className="opacity-55" /> : null}
+                                        {!active && requiresAuth && provider.status !== 'authenticated' ? <LogIn size={16} className="opacity-55" /> : null}
                                     </button>
                                     {active && provider.status === 'authenticated' && (
                                         <button

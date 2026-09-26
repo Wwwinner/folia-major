@@ -6,6 +6,7 @@ import { setPlayerState } from '../stores/usePlaybackStore';
 import { useTranslation } from 'react-i18next';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { currentTime } from '../stores/motionSignals';
+import { getLogicalAudioSource } from '../services/playbackMediaSource';
 
 // src/hooks/usePlaybackTransportController.ts
 
@@ -90,7 +91,7 @@ export function usePlaybackTransportController({
         syncOutputGain(getTargetPlaybackVolume(), 0);
         if (shouldRefreshCurrentOnlineAudioSource()) {
             const refreshed = await recoverOnlinePlaybackSource({
-                failedSrc: audioRef.current.currentSrc || audioSrc,
+                failedSrc: getLogicalAudioSource(audioRef.current) || audioSrc,
                 resumeAt: audioRef.current.currentTime,
                 autoplay: true,
             });
@@ -105,7 +106,7 @@ export function usePlaybackTransportController({
             setPlayerState(PlayerState.PLAYING);
         } catch (error) {
             const recovered = await recoverOnlinePlaybackSource({
-                failedSrc: audioRef.current.currentSrc || audioSrc,
+                failedSrc: getLogicalAudioSource(audioRef.current) || audioSrc,
                 resumeAt: audioRef.current.currentTime,
                 autoplay: true,
             });

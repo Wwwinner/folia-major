@@ -76,6 +76,7 @@ interface MeasureMonetLineLayoutOptions {
     translationFontWeight?: number;
     maxWidthPx: number;
     showSubtitleTranslation?: boolean;
+    wholeLine?: boolean;
 }
 
 const ROOT_FONT_PX = 16;
@@ -188,6 +189,13 @@ const measureTextLineCount = (text: string, fontSpec: string, maxWidthPx: number
     const prepared = prepareWithSegments(text || ' ', fontSpec, { whiteSpace: 'pre-wrap' });
     const layout = layoutWithLines(prepared, Math.max(maxWidthPx, MONET_MIN_MEASURE_WIDTH_PX), lineHeightPx);
     return Math.max(layout.lines.length, 1);
+};
+
+// 句级字幕是可换行的普通文本，不能按逐词 inline-block 的不可拆分盒子测量。
+const measureSentenceLineStats = (text: string, fontSpec: string, maxWidthPx: number, lineHeightPx: number) => {
+    const prepared = prepareWithSegments(text || ' ', fontSpec, { whiteSpace: 'pre-wrap', wordBreak: 'normal' });
+    const layout = layoutWithLines(prepared, Math.max(1, maxWidthPx), lineHeightPx);
+    return { lineCount: Math.max(layout.lines.length, 1), maxLineWidthPx: Math.max(0, ...layout.lines.map(line => line.width)) };
 };
 
 const getMonetVerticalMeasureContext = () => {
@@ -498,16 +506,19 @@ export const measureMonetLineLayout = ({
     translationFontWeight = 500,
     maxWidthPx,
     showSubtitleTranslation = true,
+    wholeLine = false,
 }: MeasureMonetLineLayoutOptions): MonetMeasuredLineLayout => {
     const fontSpec = `${fontWeight} ${fontPx}px ${fontStack}`;
     const translationFontSpec = `${translationFontWeight} ${translationFontPx}px ${translationFontStack ?? fontStack}`;
-    const lineHeightPx = measureMonetLineHeight(line.fullText, fontSpec, fontPx, fontPx * 1.18);
+    const lineHeightPx = measureMonetLineHeight(line.fullText, fontSpec, fontPx, fontPx * (wholeLine ? 1.32 : 1.18));
     const translationLineHeightPx = measureMonetLineHeight(line.translation ?? '', translationFontSpec, translationFontPx, translationFontPx * 1.28);
     const textPaddingTopPx = Math.max(fontPx * 0.16, 8);
     const textPaddingBottomPx = Math.max(fontPx * 0.34, 14);
     const translationPaddingTopPx = Math.max(translationFontPx * 0.45, 7);
     const translationPaddingBottomPx = Math.max(translationFontPx * 0.18, 5);
-    const { lineCount: textLineCount, maxLineWidthPx } = measureLyricLineStats(line, fontSpec, maxWidthPx);
+    const { lineCount: textLineCount, maxLineWidthPx } = wholeLine
+        ? measureSentenceLineStats(line.fullText, fontSpec, maxWidthPx, lineHeightPx)
+        : measureLyricLineStats(line, fontSpec, maxWidthPx);
     const textLimit = status === 'active' ? MONET_ACTIVE_TEXT_LINE_LIMIT : MONET_INACTIVE_TEXT_LINE_LIMIT;
     const visibleTextLineCount = Math.min(textLineCount, textLimit);
     const hasActiveTranslation = showSubtitleTranslation && status === 'active' && Boolean(line.translation?.trim());
@@ -544,3 +555,12 @@ export const measureMonetLineLayout = ({
         isTranslationClipped: rawTranslationLineCount > translationLineCount,
     };
 };
+
+// 浏览器可能压缩中文标点；实际排版行数只校正句级高度，不改变原文或逐词模式的测量规则。
+export function applyMonetSentenceRows(layout: MonetMeasuredLineLayout, rows: number, status: MonetLineStatus): MonetMeasuredLineLayout {
+    const visibleTextLineCount = Math.min(rows, status === 'active' ? MONET_ACTIVE_TEXT_LINE_LIMIT : MONET_INACTIVE_TEXT_LINE_LIMIT);
+    const textContentHeightPx = visibleTextLineCount * layout.lineHeightPx;
+    const textHeightPx = textContentHeightPx + layout.textPaddingTopPx + layout.textPaddingBottomPx;
+    return { ...layout, textLineCount: rows, visibleTextLineCount, textContentHeightPx, textHeightPx,
+        visualHeightPx: textHeightPx + layout.translationHeightPx, isTextClipped: rows > visibleTextLineCount };
+}

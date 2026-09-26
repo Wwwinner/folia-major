@@ -74,6 +74,8 @@ export interface RemoteControlSnapshot {
     canLike?: boolean;
     likeUnavailableProvider?: string;
     updatedAt: number;
+    playbackRate?: number;
+    isAdvancing?: boolean;
     mainWindowWidth?: number;
     mainWindowHeight?: number;
 }

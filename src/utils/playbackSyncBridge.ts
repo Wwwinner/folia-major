@@ -10,6 +10,7 @@ import { resolvePlaybackSongArtist, resolvePlaybackSongCoverUrl } from './playba
 // Derives shared playback publisher models before adapting them to Electron-facing protocols.
 
 export interface PlaybackSyncBridgeModel {
+    mainEpisodesOnly?: boolean;
     activePlaybackContext: PlaybackContext;
     currentSong: SongResult | null;
     playQueue: SongResult[];
@@ -44,6 +45,7 @@ export interface PlaybackSyncBridgeModel {
 }
 
 export interface BuildPlaybackSyncBridgeModelArgs {
+    mainEpisodesOnly?: boolean;
     activePlaybackContext: PlaybackContext;
     currentSong: SongResult | null;
     playQueue: SongResult[];
@@ -104,6 +106,7 @@ const getPlaybackSyncBridgeCoverUrl = (
 
 // Builds the single playback model used by Electron publishers with protocol-specific adapters.
 export const buildPlaybackSyncBridgeModel = ({
+    mainEpisodesOnly = false,
     activePlaybackContext,
     currentSong,
     playQueue,
@@ -137,8 +140,10 @@ export const buildPlaybackSyncBridgeModel = ({
         ? playQueue.findIndex(song => getPlaybackSongKey(song) === currentSongKey)
         : -1;
     const hasQueueNeighbors = playQueue.length > 1;
-    const canGoPrevious = hasTrack && (currentIndex > 0 || (effectiveLoopMode === 'all' && hasQueueNeighbors));
-    const canGoNext = hasTrack && (
+    const neighbors = resolvePlaybackNeighbors({ playQueue, currentSong, loopMode: effectiveLoopMode, isFmMode, isStageActive, mainEpisodesOnly });
+    const filterMain = mainEpisodesOnly && Boolean(currentSong?.episode);
+    const canGoPrevious = filterMain ? neighbors.prev.canGo : hasTrack && (currentIndex > 0 || (effectiveLoopMode === 'all' && hasQueueNeighbors));
+    const canGoNext = filterMain ? neighbors.next.canGo : hasTrack && (
         isFmMode ||
         currentIndex >= 0 && currentIndex < playQueue.length - 1 ||
         (effectiveLoopMode === 'all' && hasQueueNeighbors)
@@ -147,6 +152,7 @@ export const buildPlaybackSyncBridgeModel = ({
     const safeDurationSec = Math.max(0, clampFiniteNumber(durationSec));
 
     return {
+        mainEpisodesOnly,
         activePlaybackContext,
         currentSong,
         playQueue,
@@ -186,6 +192,7 @@ export const buildRemoteControlSnapshotFromPlaybackSyncBridge = (
     options: RemoteControlSnapshotOptions,
 ): RemoteControlSnapshot => {
     const neighbors = resolvePlaybackNeighbors({
+        mainEpisodesOnly: model.mainEpisodesOnly,
         playQueue: model.playQueue,
         currentSong: model.currentSong,
         loopMode: model.loopMode,

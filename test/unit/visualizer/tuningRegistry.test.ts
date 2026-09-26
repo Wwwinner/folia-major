@@ -1,13 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DIORAMA_TUNING, DEFAULT_SONNET_TUNING } from '../../../src/types';
+import { DEFAULT_DIORAMA_TUNING, DEFAULT_SONNET_TUNING, DEFAULT_MONET_TUNING } from '../../../src/types';
+import type { VisualizerSharedProps } from '../../../src/components/visualizer/definition';
 import {
     applyVisualizerTuningsToSettings,
+    applyVisualizerTuning,
     collectVisualizerTunings,
     getVisualizerTuningModes,
 } from '../../../src/components/visualizer/tuningRegistry';
 
 // Verifies that mode-local tuning adapters are auto-discovered for transport and settings bridges.
 describe('visualizer tuning registry', () => {
+    it('uses the same Monet tuning for the whole-line Dialogue mode without another storage key', () => {
+        const tuning = { ...DEFAULT_MONET_TUNING, fontScale: 1.8 };
+        const props = {} as VisualizerSharedProps;
+        expect(applyVisualizerTuning('dialogue', props, { monet: tuning }).monetTuning).toEqual(tuning);
+        expect(applyVisualizerTuning('monet', props, { monet: tuning }).monetTuning).toEqual(tuning);
+        expect(getVisualizerTuningModes()).not.toContain('dialogue');
+    });
     it('auto-discovers every mode with dedicated tuning', () => {
         expect(getVisualizerTuningModes().sort()).toEqual([
             'cadenza',

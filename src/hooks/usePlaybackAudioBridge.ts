@@ -16,6 +16,7 @@ import { setPlayerState } from '../stores/usePlaybackStore';
 import { useTranslation } from 'react-i18next';
 import { usePlaybackStore } from '../stores/usePlaybackStore';
 import { useAppViewStore } from '../stores/useAppViewStore';
+import { getAssignedAudioSource, isSegmentedAudioSource } from '../services/playbackMediaSource';
 
 // src/hooks/usePlaybackAudioBridge.ts
 
@@ -232,7 +233,7 @@ export function usePlaybackAudioBridge({
 
         if (audioSrc && previousAudioSrcRef.current && previousAudioSrcRef.current !== audioSrc) {
             audioElement.pause();
-            audioElement.load();
+            if (!isSegmentedAudioSource(audioSrc)) audioElement.load();
         }
 
         previousAudioSrcRef.current = audioSrc;
@@ -251,7 +252,7 @@ export function usePlaybackAudioBridge({
             // The deck's own src attribute is written from `audioSrc`, so an exact match is the
             // whole test. Bail WITHOUT spending the intent - this effect runs again on the commit
             // that gives the deck its real source, and that run is the one meant to start it.
-            if (audioRef.current.getAttribute('src') !== audioSrc) return;
+            if (getAssignedAudioSource(audioRef.current) !== audioSrc) return;
 
             // The deck has already failed on this exact source and something else - the transcode
             // fallback - is off resolving it. play() on an element in error state cannot start

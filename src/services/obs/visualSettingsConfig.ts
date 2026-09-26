@@ -6,6 +6,8 @@ import { useVisualizerAssetStore } from '../../stores/useVisualizerAssetStore';
 import { useTypographySettingsStore } from '../../stores/useTypographySettingsStore';
 import { useThemeSettingsStore } from '../../stores/useThemeSettingsStore';
 import { useStageSettingsStore } from '../../stores/useStageSettingsStore';
+import { useDesktopLyricsStore } from '../../stores/useDesktopLyricsStore';
+import { normalizeDesktopLyricsAppearance } from '../../types/desktopLyrics';
 
 // src/services/obs/visualSettingsConfig.ts
 // Everything compressConfig serializes except the theme. Reads the live settings store, so both
@@ -24,6 +26,7 @@ export function buildVisualSettingsConfig(): Record<string, unknown> {
   const songThemeAutoSwitchEnabled = readStoredThemeAutoSwitchEnabled();
   const songThemeAutoGenerateEnabled = songThemeAutoSwitchEnabled && readStoredThemeAutoGenerateEnabled();
   return {
+    desktopLyricsAppearance: normalizeDesktopLyricsAppearance(useDesktopLyricsStore.getState().state),
     songThemeAutoSwitchEnabled,
     songThemeAutoGenerateEnabled,
     themeGenerationSource: readStoredThemeGenerationSource(),

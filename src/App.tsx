@@ -2,6 +2,9 @@ import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } fro
 import { AnimatePresence, motion, useMotionValueEvent } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
+import PlaybackAudio from './components/app/playback/PlaybackAudio';
+import { getEpisodeResumePosition, useEpisodePlaybackStore } from './stores/useEpisodePlaybackStore';
+import { getAssignedAudioSource, getLogicalAudioSource, isSegmentedAudioSource } from './services/playbackMediaSource';
 import { loadCachedOrFetchCover } from './services/coverCache';
 import VisualizerRenderer from './components/visualizer/VisualizerRenderer';
 import CommandPalette from './components/command-palette/CommandPalette';
@@ -1286,14 +1289,16 @@ export default function App() {
      * The queue track a plain track-end would advance to, or null when nothing resolvable.
      * Mirrors handleNextTrack's index rules so the preview is always the track that will actually play.
      */
+    const mainEpisodesOnly = useEpisodePlaybackStore(state => state.mainOnly);
     const nextUpTrack = useMemo(() => resolveNextUpTrack({
+        mainEpisodesOnly,
         playQueue,
         song: currentSong,
         loopMode: effectiveLoopMode,
         isFmMode,
         isStageActive: isNowPlayingStageActive,
         fallbackToQueueHead: true,
-    }), [playQueue, currentSong, effectiveLoopMode, isFmMode, isNowPlayingStageActive]);
+    }), [playQueue, currentSong, effectiveLoopMode, isFmMode, isNowPlayingStageActive, mainEpisodesOnly]);
 
     /**
      * The track a running blend is bringing in: the queue successor of the DISPLAYED song.
@@ -1304,12 +1309,13 @@ export default function App() {
      * a track that is not arriving.
      */
     const blendNextUpTrack = useMemo(() => (isShowingTail ? resolveNextUpTrack({
+        mainEpisodesOnly,
         playQueue,
         song: displaySong,
         loopMode: effectiveLoopMode,
         isFmMode,
         isStageActive: isNowPlayingStageActive,
-    }) : null), [isShowingTail, displaySong, playQueue, effectiveLoopMode, isFmMode, isNowPlayingStageActive]);
+    }) : null), [isShowingTail, displaySong, playQueue, effectiveLoopMode, isFmMode, isNowPlayingStageActive, mainEpisodesOnly]);
 
     /** True while the card previews the next track (plain track-end countdown, not the blend). */
     const [countdownActive, setCountdownActive] = useState(false);
@@ -1361,7 +1367,8 @@ export default function App() {
         // currentSrc, not the src attribute: it only names a resource the element has actually
         // selected, so a deck one tick into loading something new cannot answer with the old
         // track's duration.
-        if (!audioSrc || element?.currentSrc !== audioSrc) return;
+        if (!audioSrc || !element || getLogicalAudioSource(element) !== audioSrc || element.readyState < 1
+            || (isSegmentedAudioSource(audioSrc) && element.currentSrc !== element.getAttribute('src'))) return;
         if (Number.isFinite(element.duration) && element.duration > 0) {
             setDuration(element.duration);
         }
@@ -2261,6 +2268,7 @@ export default function App() {
         handleSearchResultAddToQueue,
         handleSearchResultArtistOpen,
         handleSearchResultAlbumOpen,
+        handleSearchCollectionOpen: album => navigateToCollection(createOnlineGridViewCollection(album, album.providerId), 'search'),
         devDebugSnapshot,
         effectiveLoopMode,
         canToggleCurrentPlayback,
@@ -2361,10 +2369,11 @@ export default function App() {
     // deck that is not currently active, so a track fading out in the background can never drive
     // the progress bar, the duration, the queue, or the player state.
     const renderAudioDeck = (deck: AutomixDeckId, register: (element: HTMLAudioElement | null) => void) => (
-        <audio
+        <PlaybackAudio
             key={deck}
             ref={register}
             src={automix.deckSrc(deck)}
+            episodeSong={automix.activeDeck === deck ? currentSong : null}
             preload="auto"
             crossOrigin="anonymous"
             loop={effectiveLoopMode === 'one' && automix.activeDeck === deck}
@@ -2385,7 +2394,7 @@ export default function App() {
                 // a drift. The state this watches for is the opposite one - a source we are on
                 // that some deck never picked up.
                 if (automix.isTransitionAudible() || !audioSrc) return;
-                if (automix.isActiveDeck(e.currentTarget) && e.currentTarget.getAttribute('src') !== audioSrc) {
+                if (automix.isActiveDeck(e.currentTarget) && getAssignedAudioSource(e.currentTarget) !== audioSrc) {
                     console.error('[Audio] the active deck is loading something other than the current source', {
                         deck,
                         loading: e.currentTarget.getAttribute('src')?.slice(-40) ?? null,
@@ -2514,7 +2523,7 @@ export default function App() {
                 // transition planner needs it; only the visible clock is left alone.
                 if (isShowingTail) return;
 
-                const pendingResumeTime = pendingResumeTimeRef.current;
+                const pendingResumeTime = pendingResumeTimeRef.current ?? getEpisodeResumePosition(currentSong, getAssignedAudioSource(audioElement));
                 if (pendingResumeTime !== null) {
                     const safeDuration = Number.isFinite(audioElement.duration) && audioElement.duration > 0
                         ? Math.max(audioElement.duration - 0.25, 0)
@@ -2564,7 +2573,7 @@ export default function App() {
                     return;
                 }
 
-                if (handleTranscodeFallback(audioElement)) return;
+                if (!isSegmentedAudioSource(getLogicalAudioSource(audioElement)) && handleTranscodeFallback(audioElement)) return;
 
                 if (!isActiveDeck) {
                     automix.handleTailEnded();
@@ -2575,7 +2584,7 @@ export default function App() {
                     return;
                 }
 
-                const failedSrc = e.currentTarget.currentSrc || audioSrc;
+                const failedSrc = getLogicalAudioSource(e.currentTarget) || audioSrc;
                 const shouldRetryOnlineSong = Boolean(
                     currentSong &&
                     !isLocalPlaybackSong(currentSong) &&

@@ -4,7 +4,8 @@ import { AlertCircle, Loader2, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import type { Theme, UnifiedSong } from '../../../types';
-import type { MediaId } from '../../../types/onlineMusic';
+import type { MediaId, ProviderCollection } from '../../../types/onlineMusic';
+import SearchAlbumResults from './SearchAlbumResults';
 import {
     type SearchSource,
     useSearchNavigationStore,
@@ -26,6 +27,7 @@ type SearchWorkspaceProps = {
     onAddTrackToQueue: (track: UnifiedSong) => void;
     onOpenArtist: (track: UnifiedSong, artistName: string, artistId?: MediaId, entityId?: string) => void;
     onOpenAlbum: (track: UnifiedSong, albumName: string, albumId?: MediaId, entityId?: string) => void;
+    onOpenCollection: (album: ProviderCollection) => void;
 };
 
 const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
@@ -38,12 +40,14 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
     onAddTrackToQueue,
     onOpenArtist,
     onOpenAlbum,
+    onOpenCollection,
 }) => {
     const { t } = useTranslation();
     const {
         searchQuery,
         searchSourceTab,
         searchResults,
+        searchAlbums,
         isSearchOpen,
         isSearching,
         isLoadingMore,
@@ -56,6 +60,7 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
         searchQuery: state.searchQuery,
         searchSourceTab: state.searchSourceTab,
         searchResults: state.searchResults,
+        searchAlbums: state.searchAlbums,
         isSearchOpen: state.isSearchOpen,
         isSearching: state.isSearching,
         isLoadingMore: state.isLoadingMore,
@@ -66,6 +71,9 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
         setSearchScrollTop: state.setSearchScrollTop,
     })));
     const results = searchResults || [];
+    const resultCount = results.length + (searchAlbums?.length || 0);
+    const searchesAlbums = searchSourceTab !== 'local' && searchSourceTab !== 'navidrome'
+        && omni.getProviderCapabilities(searchSourceTab).albumSearch;
     const activeOnlineProviderId = useOnlineProviderAccountStore(state => state.activeProviderId);
     const sources = useMemo<SearchSource[]>(() => [activeOnlineProviderId, 'local', 'navidrome'], [activeOnlineProviderId]);
     const hasCollection = useCollectionNavigationStore(state => Boolean(state.snapshot?.stack.length));
@@ -122,7 +130,7 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
                                 <input
                                     value={searchQuery}
                                     onChange={event => setSearchQuery(event.target.value)}
-                                    placeholder={t('search.placeholder')}
+                                    placeholder={t(searchesAlbums ? 'home.searchAudioDrama' : 'search.placeholder')}
                                     className="w-full bg-transparent py-3.5 pl-11 pr-4 text-sm outline-none"
                                     autoFocus
                                 />
@@ -172,10 +180,11 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
                             <div className="flex h-full items-center justify-center">
                                 <Loader2 className="h-9 w-9 animate-spin opacity-45" />
                             </div>
-                        ) : searchError && results.length === 0 ? (
+                        ) : searchError && resultCount === 0 ? (
                             <div className="flex h-full flex-col items-center justify-center gap-3 text-center opacity-65">
                                 <AlertCircle size={32} />
                                 <p>{t('search.error')}</p>
+                                <p className="max-w-md text-sm opacity-70">{searchError}</p>
                                 <button
                                     type="button"
                                     onClick={() => onSubmitSearch()}
@@ -184,14 +193,15 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
                                     {t('search.retry')}
                                 </button>
                             </div>
-                        ) : results.length === 0 ? (
+                        ) : resultCount === 0 ? (
                             <div className="flex h-full items-center justify-center text-sm opacity-50">
                                 {t('home.noResults')}
                             </div>
                         ) : (
                             <div className="flex h-full flex-col">
                                 <div className="min-h-0 flex-1">
-                                    <SearchResultsList
+                                    {searchAlbums ? <SearchAlbumResults albums={searchAlbums} isDaylight={isDaylight}
+                                        scrollTop={scrollTop} onScrollTopChange={setSearchScrollTop} onOpen={onOpenCollection} /> : <SearchResultsList
                                         tracks={results}
                                         scrollTop={scrollTop}
                                         isDaylight={isDaylight}
@@ -200,7 +210,7 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
                                         onAddTrackToQueue={onAddTrackToQueue}
                                         onOpenArtist={onOpenArtist}
                                         onOpenAlbum={onOpenAlbum}
-                                    />
+                                    />}
                                 </div>
                                 {searchError ? (
                                     <div className="flex shrink-0 items-center justify-center gap-3 py-3 text-sm">

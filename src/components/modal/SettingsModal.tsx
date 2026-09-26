@@ -1796,6 +1796,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     borderColor,
                                                     isDaylight,
                                                     isElectron,
+                                                    utilityGhostButtonClass,
                                                     settingsCardClass,
                                                     settingsIconClass,
                                                     successTextColor,

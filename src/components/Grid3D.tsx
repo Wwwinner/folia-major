@@ -26,6 +26,8 @@ import { getSongCoverUrl } from '../services/onlineMusic/songMetadata';
 import OnlineProviderSwitcher from './app/home/OnlineProviderSwitcher';
 import OnlineProviderConnectPanel from './app/home/OnlineProviderConnectPanel';
 import OnlineProviderLoginModal from './app/home/OnlineProviderLoginModal';
+import OnlineDiscoveryHome from './app/home/OnlineDiscoveryHome';
+import EpisodeHistoryPage from './app/home/EpisodeHistoryPage';
 import { resolveOnlineProviderAccountView } from './app/home/onlineProviderAccountView';
 import type { MediaId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
 import qqIcon from '../assets/providers/qq.svg';
@@ -173,10 +175,16 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         submitSearch: state.submitSearch,
     })));
 
-    const isOnlineTab = homeViewTab === 'playlist' || homeViewTab === 'albums' || homeViewTab === 'radio';
+    const isOnlineTab = homeViewTab === 'playlist' || homeViewTab === 'albums' || homeViewTab === 'radio' || homeViewTab === 'history';
     const activeProviderId = onlineProviderPlatform?.activeProviderId || 'netease';
     const activeProviderSummary = onlineProviderPlatform?.activeProvider;
     const activeProviderCapabilities = omni.getProviderCapabilities(activeProviderId);
+    const isPublicCatalog = !activeProviderCapabilities.auth && !!activeProviderCapabilities.albumSearch;
+    useEffect(() => {
+        if (homeViewTab === 'history') {
+            if (!activeProviderCapabilities.publicDiscovery) setHomeViewTab('albums');
+        } else if (isPublicCatalog && isOnlineTab && homeViewTab !== 'albums') setHomeViewTab('albums');
+    }, [homeViewTab, isOnlineTab, isPublicCatalog, activeProviderCapabilities.publicDiscovery, setHomeViewTab]);
     // The FM card doubles as the mode readout: the card is the only place the current mode shows
     // up outside the player, and the picker can change it while this grid stays mounted.
     const personalFmSelection = usePersonalFmModeStore(state => state.selection);
@@ -187,7 +195,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         || activeProviderSummary?.displayName
         || omni.getProviderLabel(activeProviderId);
     const canUseOnlinePlaylists = activeProviderCapabilities.userLibrary && activeProviderCapabilities.playlists;
-    const canUseOnlineAlbums = activeProviderCapabilities.userLibrary && Boolean(activeProviderCapabilities.userAlbums);
+    const canUseOnlineAlbums = isPublicCatalog || (activeProviderCapabilities.userLibrary && Boolean(activeProviderCapabilities.userAlbums));
     const canUseOnlineRadio = activeProviderCapabilities.recommendations;
     const playlistUnavailableReason = canUseOnlinePlaylists
         ? undefined
@@ -645,7 +653,9 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     const navPillInactiveText = isDaylight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white';
     const activeTabBg = isDaylight ? 'text-black font-bold' : 'text-black';
 
-    const bottomPadding = currentTrack ? 'pb-28 md:pb-32' : '';
+    // 公开发现页已在滚动内容末尾预留空间，外层无需再裁短内容区。
+    const bottomPadding = currentTrack && !(isOnlineTab && activeProviderCapabilities.publicDiscovery)
+        ? 'pb-28 md:pb-32' : '';
 
     const focusActiveSlider = () => {
         requestAnimationFrame(() => {
@@ -746,8 +756,10 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             <div className="inline-flex items-center gap-0">
                                 {[
                                     ...(showHomeTabPlaylist ? [{ key: 'playlist', label: t('home.playlists'), disabledReason: playlistUnavailableReason }] : []),
-                                    ...(showHomeTabRadio ? [{ key: 'radio', label: t('home.radio'), disabledReason: radioUnavailableReason }] : []),
-                                    ...(showHomeTabAlbums ? [{ key: 'albums', label: t('home.albums'), disabledReason: albumsUnavailableReason }] : []),
+                                    ...(showHomeTabRadio ? [activeProviderCapabilities.publicDiscovery
+                                        ? { key: 'history', label: t('episodeHistory.tab'), disabledReason: undefined }
+                                        : { key: 'radio', label: t('home.radio'), disabledReason: radioUnavailableReason }] : []),
+                                    ...(showHomeTabAlbums ? [{ key: 'albums', label: t(activeProviderCapabilities.publicDiscovery ? 'discovery.home' : 'home.albums'), disabledReason: albumsUnavailableReason }] : []),
                                     ...(showHomeTabLocal ? [{
                                         key: 'local',
                                         label: t('localMusic.folder'),
@@ -767,6 +779,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                             className="inline-flex"
                                         >
                                             <button
+                                                data-testid={`home-tab-${tab.key}`}
                                                 disabled={Boolean(tab.disabledReason)}
                                                 aria-label={tab.disabledReason || tab.label}
                                                 onClick={() => {
@@ -834,7 +847,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             )}
                             <input
                                 type="text"
-                                placeholder={homeViewTab === 'local' ? t('home.searchLocal') : homeViewTab === 'navidrome' ? t('home.searchNavidrome') : t('home.searchDatabase')}
+                                placeholder={homeViewTab === 'local' ? t('home.searchLocal') : homeViewTab === 'navidrome' ? t('home.searchNavidrome') : t(isPublicCatalog ? 'home.searchAudioDrama' : 'home.searchDatabase')}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className={`w-full ${inputBg} border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-white/20 transition-all placeholder:text-current placeholder:opacity-40 select-text`}
@@ -847,9 +860,23 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
             {/* Desktop Canvas Surface */}
             <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative">
-                {isOnlineTab && activeAccountView === 'resolving' ? (
+                {homeViewTab === 'history' && activeProviderCapabilities.publicDiscovery ? (
+                    <EpisodeHistoryPage key={activeProviderId} providerId={activeProviderId} isDaylight={isDaylight}
+                        onOpen={album => onOpenGridView?.(createOnlineGridViewCollection(album, activeProviderId))}
+                        onPlay={onPlaySong} />
+                ) : isOnlineTab && activeAccountView === 'resolving' ? (
                     <div className="flex flex-1 w-full items-center justify-center" aria-busy="true">
                         <Loader2 className="animate-spin opacity-30" size={28} />
+                    </div>
+                ) : isOnlineTab && activeProviderCapabilities.publicDiscovery ? (
+                    <OnlineDiscoveryHome key={activeProviderId} providerId={activeProviderId} theme={theme} isDaylight={isDaylight}
+                        onOpen={album => onOpenGridView?.(createOnlineGridViewCollection(album, activeProviderId))}
+                        onPlay={onPlaySong} />
+                ) : isOnlineTab && isPublicCatalog ? (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                        <Search size={32} className="opacity-30" />
+                        <h2 className="text-xl font-semibold">{t('home.publicCatalogTitle', { provider: activeProviderLabel })}</h2>
+                        <p className="max-w-md text-sm leading-6 opacity-55">{t('home.publicCatalogPrompt')}</p>
                     </div>
                 ) : isOnlineTab && activeAccountView === 'guest' ? (
                     <OnlineProviderConnectPanel
@@ -861,11 +888,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                 provider: activeProviderSummary?.shortName || activeProviderSummary?.displayName || activeProviderId,
                             })
                             : t('home.guestPrompt')}
-                        getActionLabel={provider => provider.status === 'authenticated'
+                        getActionLabel={provider => provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth
                             ? t('home.switchToProvider', { provider: provider.shortName || provider.displayName })
                             : t('home.connectProviderAccount', { provider: provider.shortName || provider.displayName })}
                         onSelect={provider => {
-                            if (provider.status === 'authenticated') {
+                            if (provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth) {
                                 void onlineProviderPlatform?.switchProvider(provider.providerId);
                             } else {
                                 void initLogin(provider.providerId);
@@ -1003,7 +1030,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     isDaylight={isDaylight}
                     onBackToPlayer={onBackToPlayer}
                     onSelect={provider => {
-                        if (provider.status === 'authenticated') {
+                        if (provider.status === 'authenticated' || !omni.getProviderCapabilities(provider.providerId).auth) {
                             void onlineProviderPlatform.switchProvider(provider.providerId);
                         } else {
                             void initLogin(provider.providerId);

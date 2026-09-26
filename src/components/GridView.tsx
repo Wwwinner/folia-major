@@ -66,6 +66,9 @@ import { useGridSurfaceRegistration } from '../hooks/useGridSurfaceRegistration'
 import { OmniError, type MediaId, type ProviderCollection } from '../types/onlineMusic';
 import { useSidePanelBottomPx } from '../hooks/usePlayerBottomBarBottomPx';
 import { useGridViewSettingsStore } from '../stores/useGridViewSettingsStore';
+import EpisodeCollectionControls from './app/playback/EpisodeCollectionControls';
+import EpisodeTrackRow from './app/playback/EpisodeTrackRow';
+import EpisodeListLayoutButton from './app/playback/EpisodeListLayoutButton';
 
 export interface GridViewSourceActions {
     local?: {
@@ -427,6 +430,7 @@ export const GridView: React.FC<GridViewProps> = ({
     const [isDeleteFolderOpen, setIsDeleteFolderOpen] = useState(false);
     const [showCutInPanel, setShowCutInPanel] = useState(false);
     const [showSidePanel, setShowSidePanel] = useState(false);
+    const [episodeColumns, setEpisodeColumns] = useState<1 | 2>(1);
     const [searchQuery, setSearchQuery] = useState('');
     // The filter box is the command palette now; this grid only says who owns typing and where the
     // box belongs. See useGridCommandFilter for why all three grids stopped carrying their own.
@@ -1211,6 +1215,7 @@ export const GridView: React.FC<GridViewProps> = ({
         });
     }, [allGridItems, deferredSearchQuery]);
     const hasSearchQuery = deferredSearchQuery.trim().length > 0;
+    const hasEpisodes = mode === 'tracks' && displayTracks.some(track => track.episode);
     const contextActionTracks = useMemo(() => (
         resolveGridViewContextTracks(gridItems, playableTracks, hasSearchQuery)
     ), [gridItems, hasSearchQuery, playableTracks]);
@@ -2290,6 +2295,8 @@ export const GridView: React.FC<GridViewProps> = ({
                                 className="space-y-2 mt-4 pt-4 border-t shrink-0"
                                 style={{ borderTopColor: 'color-mix(in srgb, var(--text-primary) 12%, transparent)' }}
                             >
+                                {hasEpisodes && <EpisodeCollectionControls tracks={playableTracks}
+                                    onPlay={track => onSelectTrack?.(track, playableTracks)} />}
                                 <button
                                     onClick={() => {
                                         if (onPlayAll && contextActionTracks.length > 0) {
@@ -2467,7 +2474,8 @@ export const GridView: React.FC<GridViewProps> = ({
                     onClose={() => setShowSidePanel(false)}
                     title={collection?.name || title}
                     items={displayTracks}
-                    itemHeight={60}
+                    itemHeight={hasEpisodes ? 76 : 60}
+                    columns={hasEpisodes ? episodeColumns : 1}
                     isDaylight={isDaylight}
                     focusedIndex={focusedIndex}
                     hideTitle={supportsLocalTrackSorting}
@@ -2477,14 +2485,17 @@ export const GridView: React.FC<GridViewProps> = ({
                             onDirectionChange={handleLocalTrackSortDirectionChange}
                         />
                     ) : undefined}
-                    headerActions={supportsLocalTrackSorting ? (
+                    headerActions={hasEpisodes ? (
+                        <EpisodeListLayoutButton columns={episodeColumns} onChange={setEpisodeColumns} />
+                    ) : supportsLocalTrackSorting ? (
                         <LocalTrackSortMenu
                             field={localTrackSortField}
                             onFieldChange={handleLocalTrackSortFieldChange}
                         />
                     ) : undefined}
                     renderItem={(track, index, style) => (
-                        <TrackListItem
+                        track.episode ? <EpisodeTrackRow track={track} style={style} active={index === focusedIndex}
+                            onPlay={() => onSelectTrack?.(track, playableTracks)} /> : <TrackListItem
                             key={`${track.id}-${index}`}
                             track={track}
                             index={index}

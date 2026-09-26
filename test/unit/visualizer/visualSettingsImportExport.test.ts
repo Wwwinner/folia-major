@@ -181,6 +181,7 @@ describe('Visual Settings Import and Export', () => {
             showAudioVisualization: false,
             audioStyle: 'line' as const,
             fontScale: 1.1,
+            glowIntensity: 1.65,
             portraitSource: 'cover' as const,
             portraitOffsetX: -120,
             portraitStyle: 'square' as const,
@@ -232,6 +233,7 @@ describe('Visual Settings Import and Export', () => {
         expect(decoded.nomandBackgroundTuning).toEqual(sampleConfig.nomandBackgroundTuning);
         expect(decoded.latentBackgroundTuning).toEqual(sampleConfig.latentBackgroundTuning);
         expect(decoded.monetTuning?.portraitOffsetX).toBe(-120);
+        expect(decoded.monetTuning?.glowIntensity).toBe(1.65);
         expect(decoded.monetTuning?.portraitStyle).toBe('square');
         expect(decoded.monetTuning?.showAudioVisualization).toBe(false);
         expect(decoded.sonnetTuning?.enableTransitions).toBe(true);
@@ -257,6 +259,7 @@ describe('Visual Settings Import and Export', () => {
     it('correctly parses and decompresses raw long-format JSON', () => {
         const jsonString = JSON.stringify(sampleConfig);
         const decoded = decompressConfig(jsonString);
+        expect(decoded.monetTuning?.glowIntensity).toBe(1.65);
         expect(decoded.visualizerMode).toBe('monet');
         expect(decoded.randomVisualizerModePerSong).toBe(true);
         expect(decoded.backgroundOpacity).toBe(0.85);
@@ -280,6 +283,13 @@ describe('Visual Settings Import and Export', () => {
         expect(decoded.theme?.dark.accentColor).toBe('#fbbf24');
         expect(decoded.songThemeAutoSwitchEnabled).toBe(true);
         expect(decoded.songThemeAutoGenerateEnabled).toBe(true);
+    });
+
+    it('preserves zero glow and restores the existing glow for older shortcodes', () => {
+        const code = compressConfig({ ...sampleConfig, monetTuning: { ...sampleConfig.monetTuning, glowIntensity: 0 } });
+        expect(decompressConfig(code).monetTuning.glowIntensity).toBe(0);
+        const legacy = `folia-theme://${btoa('{"mt":{"mfs":1.2}}')}`;
+        expect(decompressConfig(legacy).monetTuning.glowIntensity).toBe(1);
     });
 
     it('round-trips null weights so imports can restore follow-visualizer mode', () => {

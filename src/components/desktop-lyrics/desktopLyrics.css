@@ -1,0 +1,28 @@
+/* 透明悬浮窗仅在解锁操作时显示轻量边界；文字描边保证在亮暗桌面上均可辨认。 */
+html:has(.desktop-lyrics-window), body:has(.desktop-lyrics-window), body:has(.desktop-lyrics-window) #root {
+    margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent !important;
+}
+.desktop-lyrics-window { position: relative; width: 100%; height: 100%; color: #fff; user-select: none; -webkit-app-region: drag; }
+.desktop-lyrics-window:not(.is-locked) { border: 1px solid transparent; border-radius: 14px; transition: background-color 180ms, border-color 180ms; }
+.desktop-lyrics-window:not(.is-locked):hover, .desktop-lyrics-window:not(.is-locked):focus-within { background: rgba(17, 21, 28, .28); border-color: rgba(255, 255, 255, .2); }
+.desktop-lyrics-text { position: absolute; inset: 40px 24px 20px; display: flex; flex-direction: column; justify-content: safe center; gap: 12px;
+    text-align: center; line-height: 1.4; overflow: auto; scrollbar-width: none; }
+.desktop-lyrics-sentence { margin: 0; flex: 0 0 auto; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: pretty;
+    -webkit-text-stroke: .75px rgba(0, 0, 0, .75); paint-order: stroke fill; }
+.desktop-lyrics-tools { position: absolute; z-index: 2; top: 7px; right: 10px; left: 10px; display: flex; align-items: center; gap: 3px;
+    opacity: 0; transition: opacity 140ms; }
+.desktop-lyrics-window:hover .desktop-lyrics-tools, .desktop-lyrics-window:focus-within .desktop-lyrics-tools, .desktop-lyrics-tools.is-open { opacity: 1; }
+.desktop-lyrics-drag { display: flex; align-items: center; padding-left: 8px; flex: 1; opacity: .7; }
+.desktop-lyrics-tools button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px;
+    color: #fff; background: rgba(20, 24, 30, .7); -webkit-app-region: no-drag; cursor: pointer; }
+.desktop-lyrics-tools button:hover { background: rgba(70, 78, 90, .95); }
+.desktop-lyrics-window button:focus-visible, .desktop-lyrics-window input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.desktop-lyrics-settings { position: absolute; z-index: 3; top: 45px; right: 12px; width: min(260px, calc(100% - 24px)); padding: 14px;
+    border-radius: 12px; background: #222831; color: #fff; -webkit-app-region: no-drag; }
+.desktop-lyrics-settings label { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+.desktop-lyrics-settings output { margin-left: auto; font-variant-numeric: tabular-nums; }
+.desktop-lyrics-settings input { width: 100%; accent-color: #e7eaf0; cursor: pointer; }
+.desktop-lyrics-settings p { margin: 0; font-size: 11px; color: #c6cdd8; line-height: 1.5; }
+.desktop-lyrics-empty { position: absolute; inset: 50% 20px auto; margin: 0; text-align: center; font-size: 15px; text-shadow: 0 2px 5px #000; opacity: .8; }
+.desktop-lyrics-error { position: absolute; bottom: 2px; width: 100%; text-align: center; font-size: 12px; color: #fff; background: #7b3434; }
+@media (prefers-reduced-motion: reduce) { .desktop-lyrics-window, .desktop-lyrics-tools { transition: none !important; } }

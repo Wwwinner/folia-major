@@ -13,6 +13,7 @@ import { loadOnlineLyricsState } from '../utils/onlineLyricsState';
 import { PlayerState, type StagePlayerQueueDiffOp, type StagePlayerQueueRequest, type StagePlayerSnapshot } from '../types';
 import type { LocalSong, QueueAddBehavior, SongResult, StatusMessage, UnifiedSong } from '../types';
 import type { AudioQualityPreference, MediaId } from '../types/onlineMusic';
+import { OnlineProviderError } from '../types/onlineMusic';
 import type { NextTrackOptions, PlaybackNavigationOptions, SkipPromptMessageKey, UnavailableReplacementRequest } from '../types/appPlayback';
 import type { NavidromeSong } from '../types/navidrome';
 import {
@@ -38,6 +39,8 @@ import { useAudioSettingsStore } from '../stores/useAudioSettingsStore';
 import { useSearchNavigationStore } from '../stores/useSearchNavigationStore';
 import { showLatticeFmNotice, usePlaybackEntryViewStore } from '../stores/usePlaybackEntryViewStore';
 import { useStableActionSurface } from './useStableCallbacks';
+import { resolveQueueNeighborIndex } from '../utils/episodePlayback';
+import { useEpisodePlaybackStore } from '../stores/useEpisodePlaybackStore';
 
 // src/hooks/usePlaybackQueueController.ts
 
@@ -181,6 +184,11 @@ export function usePlaybackQueueController({
     // i18n, and App.tsx was naming 15 of them purely to hand them straight back.
     const { t } = useTranslation();
     const audioQuality = useAudioSettingsStore(state => state.audioQuality);
+    const mainEpisodesOnly = useEpisodePlaybackStore(state => state.mainOnly);
+    useEffect(() => {
+        const snapshot = usePlaybackStore.getState();
+        if (snapshot.currentSong?.episode) void prefetchNearbySongs(snapshot.currentSong, snapshot.playQueue, audioQuality, userId);
+    }, [mainEpisodesOnly, audioQuality, userId]);
     const queueAddBehavior = useAudioSettingsStore(state => state.queueAddBehavior);
     const loopMode = useAudioSettingsStore(state => state.loopMode);
     const activePlaybackContext = usePlaybackStore(state => state.activePlaybackContext);
@@ -297,23 +305,9 @@ export function usePlaybackQueueController({
             return null;
         }
 
-        for (let index = currentIndex + 1; index < queue.length; index += 1) {
-            const candidate = queue[index];
-            if (isQueueSongPlayable(candidate)) {
-                return candidate;
-            }
-        }
-
-        if (loopMode === 'all' && queue.length > 1) {
-            for (let index = 0; index < currentIndex; index += 1) {
-                const candidate = queue[index];
-                if (isQueueSongPlayable(candidate)) {
-                    return candidate;
-                }
-            }
-        }
-
-        return null;
+        const index = resolveQueueNeighborIndex(queue, song, 1, loopMode, useEpisodePlaybackStore.getState().mainOnly,
+            candidate => getPlaybackSongKey(candidate) !== currentSongKey && isQueueSongPlayable(candidate));
+        return queue[index] ?? null;
     }, [isQueueSongPlayable, loopMode]);
 
     const buildQueueWithReplacementSong = useCallback((
@@ -558,8 +552,11 @@ export function usePlaybackQueueController({
                 return;
             }
         } catch (error) {
+            if (!isLatestPlaybackRequest()) return;
             console.error('[App] Failed to fetch song URL:', error);
-            setStatusMsg({ type: 'error', text: t('status.playbackError') });
+            // 取源拒绝不触发“已下架”倒计时；让用户看到适配器明确返回的原因。
+            setStatusMsg({ type: 'error', text: error instanceof OnlineProviderError
+                ? error.message : t('status.playbackError') });
             setIsLyricsLoading(false);
             return;
         }
@@ -874,15 +871,8 @@ export function usePlaybackQueueController({
             }
         }
 
-        let nextIndex = -1;
-
-        if (currentIndex >= 0 && currentIndex < playQueue.length - 1) {
-            nextIndex = currentIndex + 1;
-        } else if (currentIndex < 0 && playQueue.length > 0) {
-            nextIndex = 0;
-        } else if (loopMode === 'all') {
-            nextIndex = 0;
-        }
+        const nextIndex = resolveQueueNeighborIndex(playQueue, heldSong ?? options?.fromSong ?? currentSong,
+            1, loopMode, useEpisodePlaybackStore.getState().mainOnly);
 
         if (nextIndex >= 0) {
             void playSong(playQueue[nextIndex], playQueue, isFmMode, {
@@ -903,15 +893,8 @@ export function usePlaybackQueueController({
         // replays the current song instead of going past it.
         const heldSong = getDisplaySong?.() ?? null;
         if (heldSong) endHeldTransition?.();
-        const currentSongKey = getPlaybackSongKey(heldSong ?? currentSong);
-        const currentIndex = playQueue.findIndex(song => getPlaybackSongKey(song) === currentSongKey);
-        let prevIndex = -1;
-
-        if (currentIndex > 0) {
-            prevIndex = currentIndex - 1;
-        } else if (loopMode === 'all') {
-            prevIndex = playQueue.length - 1;
-        }
+        const prevIndex = resolveQueueNeighborIndex(playQueue, heldSong ?? currentSong,
+            -1, loopMode, useEpisodePlaybackStore.getState().mainOnly);
 
         if (prevIndex >= 0) {
             void playSong(playQueue[prevIndex], playQueue, isFmMode, {
@@ -927,10 +910,9 @@ export function usePlaybackQueueController({
         const currentIndex = currentSongKey
             ? playQueue.findIndex(song => getPlaybackSongKey(song) === currentSongKey)
             : -1;
-        const hasNextTrack = currentIndex >= 0 && (
-            currentIndex < playQueue.length - 1 ||
-            (loopMode === 'all' && playQueue.length > 1)
-        );
+        const hasNextTrack = currentIndex >= 0 && resolveQueueNeighborIndex(playQueue, currentSong,
+            1, loopMode, useEpisodePlaybackStore.getState().mainOnly,
+            song => getPlaybackSongKey(song) !== currentSongKey) >= 0;
 
         if (!hasNextTrack || skipCount >= MAX_UNAVAILABLE_AUTO_SKIP_COUNT) {
             setPlayerState(PlayerState.IDLE);
@@ -961,6 +943,7 @@ export function usePlaybackQueueController({
             : -1;
         const hasQueueNeighbors = nextQueue.length > 1;
         const hasCurrentSong = Boolean(nextCurrentSong);
+        const filterMain = Boolean(nextCurrentSong?.episode) && useEpisodePlaybackStore.getState().mainOnly;
         const audioElement = audioRef.current;
         const audioCurrentTimeSec = Number.isFinite(audioElement?.currentTime) ? audioElement?.currentTime ?? 0 : currentTime.get();
         const audioDurationSec = Number.isFinite(audioElement?.duration) && (audioElement?.duration ?? 0) > 0
@@ -976,8 +959,9 @@ export function usePlaybackQueueController({
             playerState,
             positionMs: Math.max(0, Math.floor(audioCurrentTimeSec * 1000)),
             durationMs: fallbackDurationMs,
-            canGoPrevious: hasCurrentSong && (queueCurrentIndex > 0 || (loopMode === 'all' && hasQueueNeighbors)),
-            canGoNext: hasCurrentSong && (
+            canGoPrevious: filterMain ? resolveQueueNeighborIndex(nextQueue, nextCurrentSong, -1, loopMode, true) >= 0
+                : hasCurrentSong && (queueCurrentIndex > 0 || (loopMode === 'all' && hasQueueNeighbors)),
+            canGoNext: filterMain ? resolveQueueNeighborIndex(nextQueue, nextCurrentSong, 1, loopMode, true) >= 0 : hasCurrentSong && (
                 isFmMode
                 || queueCurrentIndex >= 0 && queueCurrentIndex < nextQueue.length - 1
                 || (loopMode === 'all' && hasQueueNeighbors)

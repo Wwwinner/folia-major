@@ -327,6 +327,7 @@ const compressMonet = (t: any): any => ({
     mav: t.showAudioVisualization,
     mas: t.audioStyle,
     mfs: t.fontScale,
+    gi: t.glowIntensity,
     mps: t.portraitSource,
     pox: t.portraitOffsetX,
     mpy: t.portraitStyle,
@@ -338,6 +339,7 @@ const decompressMonet = (o: any): any => ({
     showAudioVisualization: o.mav !== undefined ? o.mav : DEFAULT_MONET_TUNING.showAudioVisualization,
     audioStyle: o.mas || DEFAULT_MONET_TUNING.audioStyle,
     fontScale: o.mfs !== undefined ? o.mfs : DEFAULT_MONET_TUNING.fontScale,
+    glowIntensity: o.gi ?? DEFAULT_MONET_TUNING.glowIntensity,
     portraitSource: o.mps || DEFAULT_MONET_TUNING.portraitSource,
     portraitOffsetX: o.pox !== undefined ? o.pox : DEFAULT_MONET_TUNING.portraitOffsetX,
     portraitStyle: o.mpy || DEFAULT_MONET_TUNING.portraitStyle,
@@ -499,6 +501,7 @@ export const compressConfig = (config: any): string => {
     if (config.nomandBackgroundTuning) minified.nbt = compressNomandBackground(config.nomandBackgroundTuning);
     if (config.latentBackgroundTuning) minified.lbt = compressLatentBackground(config.latentBackgroundTuning);
     if (config.monetTuning) minified.mt = compressMonet(config.monetTuning);
+    if (config.desktopLyricsAppearance) minified.dla = { fontSize: config.desktopLyricsAppearance.fontSize, glowIntensity: config.desktopLyricsAppearance.glowIntensity };
     if (config.pendoloTuning) minified.pdt = compressPendolo(config.pendoloTuning);
     if (config.sonnetTuning) minified.snt = compressSonnet(config.sonnetTuning);
     if (config.temperaTuning) minified.tmp = compressTempera(config.temperaTuning);
@@ -622,6 +625,7 @@ export const decompressConfig = (str: string): any => {
         if (parsed.nbt) decompressed.nomandBackgroundTuning = decompressNomandBackground(parsed.nbt);
         if (parsed.lbt) decompressed.latentBackgroundTuning = decompressLatentBackground(parsed.lbt);
         if (parsed.mt) decompressed.monetTuning = decompressMonet(parsed.mt);
+        if (parsed.dla) decompressed.desktopLyricsAppearance = { fontSize: parsed.dla.fontSize, glowIntensity: parsed.dla.glowIntensity };
         if (parsed.pdt) decompressed.pendoloTuning = decompressPendolo(parsed.pdt);
         if (parsed.snt) decompressed.sonnetTuning = decompressSonnet(parsed.snt);
         if (parsed.tmp) decompressed.temperaTuning = decompressTempera(parsed.tmp);
@@ -649,6 +653,7 @@ export const decompressConfig = (str: string): any => {
             'cadenzaTuning', 'partitaTuning', 'fumeTuning', 'claddaghTuning', 'cappellaTuning',
             'tiltTuning', 'dioramaTuning', 'monetBackgroundTuning', 'nomandBackgroundTuning', 'latentBackgroundTuning', 'monetTuning',
             'pendoloTuning', 'sonnetTuning', 'temperaTuning',
+            'desktopLyricsAppearance',
             'urlBackgroundList', 'urlBackgroundSelectedId',
             'songThemeAutoSwitchEnabled', 'songThemeAutoGenerateEnabled', 'themeGenerationSource', 'followSystemTheme',
             'stageTrackPillMode', 'stageTrackPillTimeoutSec', 'stageTrackPillOnHome',

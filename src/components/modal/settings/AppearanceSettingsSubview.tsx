@@ -33,6 +33,7 @@ import { useTypographySettingsStore } from '../../../stores/useTypographySetting
 import { usePlayerChromeSettingsStore } from '../../../stores/usePlayerChromeSettingsStore';
 import { useThemeSettingsStore } from '../../../stores/useThemeSettingsStore';
 import { useStageSettingsStore } from '../../../stores/useStageSettingsStore';
+import { useDesktopLyricsStore } from '../../../stores/useDesktopLyricsStore';
 
 // src/components/modal/settings/AppearanceSettingsSubview.tsx
 // Visual settings subview for theme presets, lyric renderer entry, layout settings, and configurations import/export.
@@ -516,6 +517,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                 if (has('temperaTuning') && config.temperaTuning) storeVisualizer.handleSetTemperaTuning(config.temperaTuning);
             }
 
+            if (has('desktopLyricsAppearance') && config.desktopLyricsAppearance) void useDesktopLyricsStore.getState().setAppearance(config.desktopLyricsAppearance);
             if (has('monetBackgroundTuning') && config.monetBackgroundTuning) {
                 storeVisualizer.handleSetMonetBackgroundTuning(config.monetBackgroundTuning);
             }

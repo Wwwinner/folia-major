@@ -71,6 +71,8 @@ export interface VisualizerSharedProps {
     alwaysShowBackButton?: boolean;
     onPlayerPanelGuideHotspotChange?: (isActive: boolean) => void;
     onLyricLineSeek?: (lyricTimeSec: number) => void;
+    /** 句级字幕和两行预排版；只有 index < startedCount 的文本能挂载，未来两行只显示雾。 */
+    sentencePlayback?: { activeLineIndices: ReadonlySet<number>; emptyText: string; startedCount: number };
     isPreviewMode?: boolean;
     visualizerTunings?: VisualizerTuningBundle;
     classicTuning?: ClassicTuning;

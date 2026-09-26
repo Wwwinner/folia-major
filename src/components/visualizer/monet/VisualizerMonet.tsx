@@ -54,6 +54,7 @@ const VisualizerMonet: React.FC<VisualizerMonetProps> = (props) => {
         monetPortraitImage = null,
         onMonetTuningChange,
         onLyricLineSeek,
+        sentencePlayback,
         seed,
     } = props;
     const { t } = useTranslation();
@@ -289,7 +290,9 @@ const VisualizerMonet: React.FC<VisualizerMonetProps> = (props) => {
                                     translationFontStack={translationFontStack}
                                     subtitleTheme={subtitleTheme}
                                     keywordColoringEnabled={monetTuning.keywordColoringEnabled}
-                                    emptyText=""
+                                    glowIntensity={monetTuning.glowIntensity}
+                                    emptyText={sentencePlayback?.emptyText ?? ''}
+                                    sentencePlayback={sentencePlayback}
                                     showSubtitleTranslation={resolvedSubtitleContentMode !== 'none'}
                                     audioPower={audioPower}
                                     audioBands={audioBands}

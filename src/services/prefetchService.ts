@@ -22,6 +22,10 @@ import { modeNeedsBeatGrid } from './automix/transitionStrategy';
 import { useLyricSettingsStore } from '../stores/useLyricSettingsStore';
 import { useAutomixSettingsStore } from '../stores/useAutomixSettingsStore';
 import { useAudioSettingsStore } from '../stores/useAudioSettingsStore';
+import { useEpisodePlaybackStore } from '../stores/useEpisodePlaybackStore';
+import { resolveQueueNeighborIndex } from '../utils/episodePlayback';
+import { prefetchSegmentedAudioStart } from './segmentedAudioPrefetch';
+import { waitForEpisodePrefetchReadiness } from './episodePrefetchReadiness';
 
 // Prefetch configuration
 //
@@ -164,7 +168,8 @@ const prefetchSong = async (
     song: SongResult,
     audioQuality: AudioQualityPreference,
     signal: AbortSignal,
-    userId?: MediaId | null
+    userId?: MediaId | null,
+    playingSong?: SongResult,
 ): Promise<void> => {
     if (signal.aborted) return;
 
@@ -230,6 +235,12 @@ const prefetchSong = async (
                         ? { ...data.replayGain, ...audioSource.replayGain }
                         : data.replayGain;
                     console.log(`[Prefetch] Got audio URL for: ${song.name} (quality: ${audioQuality})`);
+                    if (signal.aborted) return;
+                    // 先公开同一会话 URL：用户此时点播也能合并进行中的首片下载。
+                    touchPrefetchCacheEntry(songKey, data);
+                    if (playingSong && !await waitForEpisodePrefetchReadiness(playingSong, signal)) return;
+                    await prefetchSegmentedAudioStart(url, signal);
+                    if (signal.aborted) return;
                 }
             }
         } catch (e) {
@@ -279,7 +290,8 @@ const prefetchSong = async (
   const settingsLyricSettings = useLyricSettingsStore.getState();
                 const autoUseBest = settingsLyricSettings.autoUseBestLyric;
                 const preferredSource = settingsLyricSettings.preferredAlternativeLyricSource;
-                const shouldAutoMatch = autoUseBest && !onlineLyricsState?.hasOnlineOverride;
+                const shouldAutoMatch = autoUseBest && !onlineLyricsState?.hasOnlineOverride
+                    && omni.getProviderCapabilities(sourceRef.providerId).alternativeLyrics !== false;
 
                 if (shouldAutoMatch) {
                     try {
@@ -427,7 +439,8 @@ export const prefetchNearbySongs = async (
     // are no longer either half of the next transition. This function is called on every track change
     // and every queue change, which is exactly when that set moves - and analysis is serial, so a
     // stale entry does not merely waste itself, it delays the track the listener just chose.
-    const nextSong = currentIndex >= 0 ? queue[currentIndex + 1] : undefined;
+    const mainOnly = useEpisodePlaybackStore.getState().mainOnly;
+    const nextSong = currentIndex >= 0 ? queue[resolveQueueNeighborIndex(queue, currentSong, 1, 'off', mainOnly)] : undefined;
     setAnalysisScope(nextSong ? [currentSong, nextSong] : [currentSong]);
 
     if (currentIndex === -1) {
@@ -446,19 +459,21 @@ export const prefetchNearbySongs = async (
     const songsToPrefetch: SongResult[] = [];
 
     // Next songs
+    let nextAnchor = currentSong;
     for (let i = 1; i <= PREFETCH_COUNT_NEXT; i++) {
-        const idx = currentIndex + i;
-        if (idx < queue.length) {
-            songsToPrefetch.push(queue[idx]);
-        }
+        const idx = resolveQueueNeighborIndex(queue, nextAnchor, 1, 'off', mainOnly);
+        if (idx < 0) break;
+        songsToPrefetch.push(queue[idx]);
+        nextAnchor = queue[idx];
     }
 
     // Previous songs
+    let prevAnchor = currentSong;
     for (let i = 1; i <= PREFETCH_COUNT_PREV; i++) {
-        const idx = currentIndex - i;
-        if (idx >= 0) {
-            songsToPrefetch.push(queue[idx]);
-        }
+        const idx = resolveQueueNeighborIndex(queue, prevAnchor, -1, 'off', mainOnly);
+        if (idx < 0) break;
+        songsToPrefetch.push(queue[idx]);
+        prevAnchor = queue[idx];
     }
 
     console.log(`[Prefetch] Will prefetch ${songsToPrefetch.length} songs near index ${currentIndex}`);
@@ -478,7 +493,8 @@ export const prefetchNearbySongs = async (
             requestIdleCallback(
                 async () => {
                     if (signal.aborted) return;
-                    await prefetchSong(song, audioQuality, signal, userId);
+                    if (!await waitForEpisodePrefetchReadiness(currentSong, signal)) return;
+                    await prefetchSong(song, audioQuality, signal, userId, currentSong);
                     prefetchWithIdle(songs, index + 1);
                 },
                 { timeout: 5000 }
@@ -487,7 +503,8 @@ export const prefetchNearbySongs = async (
             // Fallback for browsers without requestIdleCallback
             setTimeout(async () => {
                 if (signal.aborted) return;
-                await prefetchSong(song, audioQuality, signal, userId);
+                if (!await waitForEpisodePrefetchReadiness(currentSong, signal)) return;
+                await prefetchSong(song, audioQuality, signal, userId, currentSong);
                 prefetchWithIdle(songs, index + 1);
             }, 100);
         }

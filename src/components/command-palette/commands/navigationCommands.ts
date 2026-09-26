@@ -1,5 +1,6 @@
 import type { CommandPaletteCommand } from '../types';
 import { defineCommand, createToggleCommand, createHomeTabCommand } from '../commandFactories';
+import { omni } from '../../../services/onlineMusic/omni';
 
 // src/components/command-palette/commands/navigationCommands.ts
 // Commands in the `navigation` group: moving between home tabs, the player, and window-level views.
@@ -36,6 +37,10 @@ export const navigationCommands: CommandPaletteCommand[] = [
     createHomeTabCommand('albums', 'Open albums', 'Open albums tab', ['albums', 'album', '专辑']),
     createHomeTabCommand('navidrome', 'Open Navidrome', 'Open Navidrome tab', ['navidrome', 'navi', '服务器']),
     createHomeTabCommand('radio', 'Open radio', 'Open radio tab', ['radio', 'fm', '电台']),
+    {
+        ...createHomeTabCommand('history', 'Open listening history', 'Open episode history and resume listening', ['listening history', 'resume episodes', '收听记录', '续听']),
+        isAvailable: () => Boolean(omni.getProviderCapabilities(omni.getActiveProviderSummary()?.providerId || 'netease').publicDiscovery),
+    },
     {
         id: 'desktop-toggle-remote-control',
         platform: ['electron'],

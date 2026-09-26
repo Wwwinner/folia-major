@@ -145,12 +145,14 @@ describe('Monet tuning and lyric helpers', () => {
             showAudioVisualization: false,
             audioStyle: 'line',
             fontScale: 3,
+            glowIntensity: 3,
             portraitSource: 'custom',
         })).toEqual({
             keywordColoringEnabled: false,
             showAudioVisualization: false,
             audioStyle: 'line',
             fontScale: 1.5,
+            glowIntensity: 2,
             portraitSource: 'custom',
             showDescription: true,
             portraitOffsetX: 0,
@@ -166,6 +168,10 @@ describe('Monet tuning and lyric helpers', () => {
         })).toEqual(DEFAULT_MONET_TUNING);
 
         expect(resolveStoredMonetTuning({})).toEqual(DEFAULT_MONET_TUNING);
+        expect(resolveStoredMonetTuning({ glowIntensity: -1 }).glowIntensity).toBe(0);
+        expect(resolveStoredMonetTuning({ glowIntensity: 0 }).glowIntensity).toBe(0);
+        expect(resolveStoredMonetTuning({ glowIntensity: NaN }).glowIntensity).toBe(1);
+        expect(resolveStoredMonetTuning({ glowIntensity: Infinity }).glowIntensity).toBe(1);
     });
 
     it('resolves automatic visualizer background mode', () => {

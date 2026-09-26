@@ -4,6 +4,7 @@ import type { ThemeGenerationSource } from '../../../services/themePreferences';
 import { useAudioSettingsStore } from '../../../stores/useAudioSettingsStore';
 import { useAutomixSettingsStore } from '../../../stores/useAutomixSettingsStore';
 import { useDesktopSettingsStore } from '../../../stores/useDesktopSettingsStore';
+import { useDesktopLyricsStore } from '../../../stores/useDesktopLyricsStore';
 import { useLocalLibrarySettingsStore } from '../../../stores/useLocalLibrarySettingsStore';
 import { isLocalLibraryAutoScanSupported } from '../../../services/localLibraryAutoScan';
 import { isNeteaseScrobbleReady } from '../../../services/onlineMusic/playbackReportGate';
@@ -152,6 +153,10 @@ export const buildSettingsCommandContext = (
         toggleWallpaperMode: () => desktop.handleToggleWallpaperMode(
             !useDesktopSettingsStore.getState().wallpaperMode,
         ),
+        toggleDesktopLyrics: () => { const store = useDesktopLyricsStore.getState(); void store.update({ enabled: !store.state.enabled }); },
+        toggleDesktopLyricsLock: () => { const store = useDesktopLyricsStore.getState(); void store.update({ locked: !store.state.locked }); },
+        canLockDesktopLyrics: () => useDesktopLyricsStore.getState().state.enabled,
+        resetDesktopLyricsPosition: () => { void useDesktopLyricsStore.getState().update({ resetPosition: true, locked: false }); },
         toggleWallpaperMacAutohideDock: () => desktop.handleToggleWallpaperMacAutohideDock(
             !useDesktopSettingsStore.getState().wallpaperMacAutohideDock,
         ),

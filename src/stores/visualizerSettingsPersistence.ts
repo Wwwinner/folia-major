@@ -899,6 +899,9 @@ export const resolveStoredMonetTuning = (parsed: StoredMonetTuningInput): MonetT
         parsed.fontScale ?? DEFAULT_MONET_TUNING.fontScale,
         DEFAULT_MONET_TUNING.fontScale,
     ),
+    glowIntensity: typeof parsed.glowIntensity === 'number' && Number.isFinite(parsed.glowIntensity)
+        ? Math.min(2, Math.max(0, parsed.glowIntensity))
+        : DEFAULT_MONET_TUNING.glowIntensity,
     portraitSource: resolveMonetPortraitSource(parsed.portraitSource),
     portraitOffsetX: typeof parsed.portraitOffsetX === 'number'
         ? Math.min(0, Math.max(-150, parsed.portraitOffsetX))

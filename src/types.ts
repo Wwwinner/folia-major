@@ -120,7 +120,7 @@ export type BuiltinVisualizerMode = 'classic' | 'cadenza' | 'partita' | 'fume' |
 export type VisualizerMode = BuiltinVisualizerMode | (string & {});
 export type VisualizerFrameRate = 'off' | 120 | 90 | 60;
 
-export type HomeViewTab = 'playlist' | 'local' | 'albums' | 'navidrome' | 'radio';
+export type HomeViewTab = 'playlist' | 'local' | 'albums' | 'navidrome' | 'radio' | 'history';
 
 export type PlaybackContext = 'main' | 'stage';
 export type StageSource = 'stage-api' | 'now-playing' | 'playercap';
@@ -894,6 +894,7 @@ export interface MonetTuning {
   showAudioVisualization: boolean;
   audioStyle: MonetAudioStyle;
   fontScale: number;
+  glowIntensity: number;
   portraitSource: MonetPortraitSource;
   portraitOffsetX?: number;
   portraitStyle?: 'square' | 'rectangular';
@@ -965,6 +966,7 @@ export const DEFAULT_MONET_TUNING: MonetTuning = {
   showAudioVisualization: true,
   audioStyle: 'bar',
   fontScale: 1.2,
+  glowIntensity: 1,
   portraitSource: 'cover',
   portraitOffsetX: 0,
   portraitStyle: 'square',
@@ -1117,6 +1119,8 @@ export interface SongResult {
   album: Album;
   durationMs: number;
   isPureMusic?: boolean;
+  /** Provider-normalized episodic content; main includes provider-designated mini episodes. */
+  episode?: { kind: 'main' | 'extra' | 'unknown'; playCount?: number };
   aliases?: string[];
   translatedNames?: string[];
   t?: 0 | 1 | 2;

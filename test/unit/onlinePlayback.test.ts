@@ -19,6 +19,7 @@ vi.mock('@/services/onlineMusic/omni', () => ({
     omni: {
         getAudioSource: sourceMock,
         getLyrics: lyricsMock,
+        getProviderCapabilities: (id: string) => ({ alternativeLyrics: id !== 'fanjiao' }),
     },
 }));
 
@@ -57,6 +58,7 @@ vi.mock('@/utils/blobGuards', () => ({
 import { loadOnlineSongAudioSource, loadOnlineSongLyrics } from '@/services/onlinePlayback';
 import { markOnlineLyricsPureMusic } from '@/utils/onlineLyricsState';
 import type { SongResult } from '@/types';
+import { OnlineProviderError } from '@/types/onlineMusic';
 
 // test/unit/onlinePlayback.test.ts
 
@@ -74,6 +76,20 @@ describe('online audio ReplayGain plumbing', () => {
         vi.clearAllMocks();
         cachedAudioMock.mockResolvedValue(null);
         isUrlValidMock.mockReturnValue(true);
+    });
+
+    it.each(['not-playable', 'auth-required', 'network', 'unavailable'] as const)(
+        'preserves %s errors instead of reporting a missing song', async code => {
+            const error = new OnlineProviderError(code, 'Provider-specific reason', 'fanjiao');
+            sourceMock.mockRejectedValueOnce(error);
+            await expect(loadOnlineSongAudioSource(song, 'high', null)).rejects.toBe(error);
+            expect(updatePrefetchedAudioUrlMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it('keeps an explicit missing audio source distinct from a request error', async () => {
+        sourceMock.mockResolvedValueOnce(null);
+        await expect(loadOnlineSongAudioSource(song, 'high', null)).resolves.toEqual({ kind: 'unavailable' });
     });
 
     it('returns provider metadata and stores it with the prefetched URL', async () => {

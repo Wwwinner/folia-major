@@ -106,4 +106,28 @@ test.describe('settings navigation - narrow layout', () => {
 
         expect(gap).toBe(8);
     });
+
+    test('drags chips without selecting and keeps subsequent keyboard and mouse selection working', async ({ mount, page }) => {
+        await mount('settingsNavigation');
+        const strip = page.locator('.space-x-2');
+        const active = () => strip.locator('button').evaluateAll(buttons => buttons.find(button => button.classList.contains('bg-white/10'))?.textContent);
+        const before = await active();
+        const box = (await strip.boundingBox())!;
+        await page.mouse.move(box.x + box.width - 30, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + 40, box.y + box.height / 2, { steps: 12 });
+        await page.mouse.up();
+        const released = await strip.evaluate(node => node.scrollLeft);
+        expect(released).toBeGreaterThan(50);
+        expect(await active()).toBe(before);
+        await page.waitForTimeout(150);
+        expect(await strip.evaluate(node => node.scrollLeft)).toBeCloseTo(released, 0);
+        const last = strip.locator('button').last();
+        await last.focus();
+        await page.keyboard.press('Enter');
+        await expect(last).toHaveClass(/bg-white\/10/);
+        const first = strip.locator('button').first();
+        await first.click();
+        await expect(first).toHaveClass(/bg-white\/10/);
+    });
 });

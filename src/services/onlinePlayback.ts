@@ -13,6 +13,7 @@ import { getCachedSongAudioBlob, getCachedSongReplayGain, getSongCacheWithLegacy
 import { toSafePlaybackUrl } from '../utils/appPlaybackHelpers';
 import { getProviderSongMetadata } from './onlineMusic/songMetadata';
 import { useLyricSettingsStore } from '../stores/useLyricSettingsStore';
+import { rememberEpisodeSource } from './playbackMediaSource';
 
 export async function loadOnlineSongAudioSource(
     song: SongResult,
@@ -33,14 +34,14 @@ export async function loadOnlineSongAudioSource(
                 replayGain = await getCachedSongReplayGain(song);
                 if (replayGain) console.log(`[Cache] ReplayGain recovered for "${song.name}" from the store, not the provider`);
             }
-            return { kind: 'ok', audioSrc: blobUrl, blobUrl, replayGain };
+            return { kind: 'ok', audioSrc: rememberEpisodeSource(song, blobUrl), blobUrl, replayGain };
         }
     }
 
     if (prefetched?.audioUrl && prefetched.audioUrl !== 'CACHED_IN_DB' && isUrlValid(prefetched.audioUrlFetchedAt)) {
         return {
             kind: 'ok',
-            audioSrc: prefetched.audioUrl,
+            audioSrc: rememberEpisodeSource(song, prefetched.audioUrl),
             replayGain: song.replayGain ?? prefetched.replayGain,
         };
     }
@@ -50,7 +51,8 @@ export async function loadOnlineSongAudioSource(
         source = await omni.getAudioSource(song, audioQuality);
     } catch (error) {
         console.warn('[OnlinePlayback] Provider audio source is temporarily unavailable', error);
-        return { kind: 'unavailable' };
+        // 请求失败保留原来的分类；权限、配置与网络错误不等于服务端确认没有可用音源。
+        throw error;
     }
     const url = toSafePlaybackUrl(source?.url);
     if (!url) {
@@ -59,7 +61,7 @@ export async function loadOnlineSongAudioSource(
 
     const replayGain = applyOnlineAudioSourceMetadata(song, source?.replayGain).replayGain;
     updatePrefetchedAudioUrl(song, url, audioQuality, replayGain);
-    return { kind: 'ok', audioSrc: url, replayGain };
+    return { kind: 'ok', audioSrc: rememberEpisodeSource(song, url), replayGain };
 }
 
 export const applyOnlineAudioSourceMetadata = (
@@ -164,7 +166,8 @@ export async function loadOnlineSongLyrics(
     let finalState = onlineLyricsState;
 
   const settingsLyricSettings = useLyricSettingsStore.getState();
-    const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric && !onlineLyricsState?.hasOnlineOverride;
+    const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric && !onlineLyricsState?.hasOnlineOverride
+        && !(song.sourceRef?.kind === 'online' && omni.getProviderCapabilities(song.sourceRef.providerId).alternativeLyrics === false);
 
     if (shouldAutoMatch) {
         // The lyrics in hand are already displayable, so hand them over and report done BEFORE the

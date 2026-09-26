@@ -251,6 +251,10 @@ export type CommandPaletteSettingsContext = {
     toggleVoiceInputPause: () => void;
     togglePreventDisplaySleepDuringPlayback: () => void;
     toggleWallpaperMode: () => void;
+    toggleDesktopLyrics: () => void;
+    toggleDesktopLyricsLock: () => void;
+    canLockDesktopLyrics: () => boolean;
+    resetDesktopLyricsPosition: () => void;
     /** macOS-only: the wallpaper-mode Dock auto-hide override (on by default). */
     toggleWallpaperMacAutohideDock: () => void;
     sleepTimerEnabled: boolean;

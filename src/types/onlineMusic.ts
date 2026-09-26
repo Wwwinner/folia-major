@@ -30,6 +30,8 @@ export type PlaybackSourceRef =
 
 export interface ProviderCapabilities {
     search: boolean;
+    albumSearch?: boolean;
+    alternativeLyrics?: boolean;
     playback: boolean;
     lyrics: boolean;
     auth: boolean;
@@ -38,6 +40,8 @@ export interface ProviderCapabilities {
     albums: boolean;
     artists: boolean;
     recommendations: boolean;
+    /** Public, sectioned discovery without requiring a user library or login. */
+    publicDiscovery?: boolean;
     mutations: boolean;
     /** Personal FM can be steered by mode/scene, i.e. `getPersonalFm` honours PersonalFmRequestOptions. */
     personalFmModes?: boolean;
@@ -151,12 +155,22 @@ export interface ProviderHistoryEntry {
     providerData?: Record<string, JsonValue>;
 }
 
+export interface CollectionRanking {
+    position: number;
+    value?: number;
+    metric: 'feeding' | 'followers' | 'popularity' | 'plays';
+}
+
 export interface ProviderCollection {
     providerId: OnlineProviderId;
     id: MediaId;
     name: string;
     type: 'playlist' | 'album' | 'artist' | 'radio' | 'cloud' | string;
     coverUrl?: string;
+    posterUrl?: string;
+    landscapeCoverUrl?: string;
+    latestEpisodeName?: string;
+    promotionLabel?: string;
     description?: string;
     trackCount?: number;
     albumCount?: number;
@@ -167,6 +181,7 @@ export interface ProviderCollection {
     publishedAt?: number;
     publisher?: string;
     playCount?: number;
+    ranking?: CollectionRanking;
     updatedAt?: number;
     tracksUpdatedAt?: number;
     isLiked?: boolean;
@@ -205,6 +220,7 @@ export class OnlineProviderError extends Error {
 
 export interface OnlineSearchProvider {
     searchSongs(query: string, limit: number, offset: number): Promise<ProviderPage<UnifiedSong>>;
+    searchAlbums?(query: string, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
 }
 
 export interface OnlinePlaybackProvider {
@@ -307,6 +323,35 @@ export interface OnlineRecommendationProvider {
     dislikeSong?(id: MediaId): Promise<{ replacement?: UnifiedSong; limitReached?: boolean }>;
 }
 
+export interface HomeDiscoveryBanner<T = ProviderCollection> {
+    id: string;
+    title: string;
+    imageUrl: string;
+    album: T;
+}
+
+export interface HomeDiscoverySection<T = ProviderCollection> {
+    id: string;
+    title: string;
+    kind: 'albums' | 'ranking' | 'banners';
+    items: T[];
+    banners?: HomeDiscoveryBanner<T>[];
+    moreId?: string;
+    layout?: 'landscape-grid';
+}
+export type CollectionBrowseFilterKey = 'category' | 'style' | 'completion' | 'price' | 'sort';
+export type CollectionBrowseQuery = Partial<Record<CollectionBrowseFilterKey, string>>;
+export interface CollectionBrowseFilter {
+    key: CollectionBrowseFilterKey;
+    options: Array<{ value: string; label: string }>;
+}
+export interface OnlineDiscoveryProvider {
+    getHomeSections(limit: number, offset: number): Promise<ProviderPage<HomeDiscoverySection>>;
+    getSectionCollections?(id: string, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
+    getBrowseFilters(): Promise<CollectionBrowseFilter[]>;
+    browseCollections(query: CollectionBrowseQuery, limit: number, offset: number): Promise<ProviderPage<ProviderCollection>>;
+}
+
 export interface OnlineMutationProvider {
     canAddToPlaylist?(playlist: ProviderCollection): boolean;
     likeSong?(
@@ -342,6 +387,7 @@ export interface OnlineMusicProvider {
     library?: OnlineLibraryProvider;
     catalog?: OnlineCatalogProvider;
     recommendations?: OnlineRecommendationProvider;
+    discovery?: OnlineDiscoveryProvider;
     mutations?: OnlineMutationProvider;
 }
 

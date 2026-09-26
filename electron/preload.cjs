@@ -133,6 +133,8 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('netease-api-status-changed', listener);
     },
     getKugouApiStatus: () => ipcRenderer.invoke('kugou-api-status'),
+    getFanjiaoStatus: () => ipcRenderer.invoke('fanjiao-status'),
+    fanjiaoRequest: (operation, params) => ipcRenderer.invoke('fanjiao-request', operation, params),
     kugouRequest: (operation, params) => ipcRenderer.invoke('kugou-api-request', operation, params),
     getQqPort: () => ipcRenderer.invoke('get-qq-port'),
     getQqApiStatus: () => ipcRenderer.invoke('get-qq-api-status'),
@@ -218,6 +220,13 @@ contextBridge.exposeInMainWorld('electron', {
         return () => ipcRenderer.removeListener('thumbar-action', listener);
     },
     openRemoteControl: () => ipcRenderer.invoke('remote-control-open'),
+    getDesktopLyricsState: () => ipcRenderer.invoke('desktop-lyrics-state'),
+    updateDesktopLyrics: (patch) => ipcRenderer.invoke('desktop-lyrics-update', patch),
+    onDesktopLyricsState: (callback) => {
+        const listener = (_event, state) => callback(state);
+        ipcRenderer.on('desktop-lyrics-state-changed', listener);
+        return () => ipcRenderer.removeListener('desktop-lyrics-state-changed', listener);
+    },
     toggleRemoteControl: () => ipcRenderer.invoke('remote-control-toggle'),
     closeRemoteControl: () => ipcRenderer.invoke('remote-control-close'),
     getRemoteControlAlwaysOnTop: () => ipcRenderer.invoke('remote-control-get-always-on-top'),

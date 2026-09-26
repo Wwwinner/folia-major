@@ -41,6 +41,7 @@ App / ThemePark / VisPlayground / OBS source
 | `tilt` | Tilt | `tilt/VisualizerTilt.tsx`、`tilt/tuning.ts` |
 | `claddagh` | Claddagh | `claddagh/VisualizerCladdagh.tsx`、`claddagh/tuning.ts` |
 | `monet` | Monet | `monet/VisualizerMonet.tsx`、`monet/monetLyricsModel.ts`、`monet/tuning.ts` |
+| `dialogue` | 对白 | `dialogue/VisualizerDialogue.tsx`、`dialogue/dialogueTimeline.ts`；渲染直接复用莫奈 |
 | `diorama` | 镜台 | `diorama/VisualizerDiorama.tsx`、`diorama/DioramaScene.tsx`、`diorama/dioramaTextRaster.ts` |
 | `pendolo` | Pendolo | `pendolo/VisualizerPendolo.tsx`、`pendolo/pendoloTextLayout.ts`、`pendolo/pendoloTimeline.ts` |
 | `sonnet` | 商籁 | `sonnet/VisualizerSonnet.tsx`、`sonnet/createSonnetPixiRuntime.ts`、`sonnet/*` |
@@ -111,6 +112,20 @@ Visualizer 消费已解析的 `LyricData` / `Line` / `Word`，不负责解析 `.
 ### Monet
 
 `monet/VisualizerMonet.tsx` 组合 `MonetLyricsRail`、`AudioOverlay`、浮动装饰和背景 pipeline；图像资源还涉及 `src/services/monetBackgroundImage.ts`、`monetPortraitImage.ts`。
+
+### Dialogue
+
+`DialogueMist.tsx` 提前将未来两句排成纯雾 waiting 行，到句子开始才挂载文本，不能生成未来文字 DOM、可访问名称或可点击目标。第二团雾位于下沿渐隐区，切句时保持行、雾和画布的节点身份，用莫奈原有弹簧依次上移；仅新挂载的尾雾从下方进入，不对已有行重播入场，也不另加内层文字平移或 LayoutGroup 投影。文字到点开始显现，雾先随行起步再消散；两者均由播放 MotionValue 驱动，短句时限由 `dialogueMistMotion.ts` 约束。手动回看只包含已开始行，减少动态效果时关闭雾层。
+
+`DialogueMistTexture.tsx` 以播放时钟更新局部 WebGL 雾纹，每句用稳定序号错开宽度和纹理相位，避免接棒时出现相同图案。`dialogueMistShader.ts` 用多层噪声扭曲形成内部流动、薄厚变化与卷动边缘，散开时从中央变薄并向外舒展。`dialogueMistRenderer.ts` 复用 twgl，画布不超过 384×128、局部最多 30fps；不在绘制帧中测量布局或更新 React 状态。暂停后没有常驻绘制循环，离屏、页面隐藏或散雾结束时停止绘制，卸载时取消订阅并释放资源。演示页「看雾队列」可连续观察接棒过程。
+
+`dialogueRailEntries.ts` 在自动跟随时把所有未结束句补入莫奈的附近窗口，按时间顺序排列，并以活动组整体定位。空间不足时只收起活动组中间的历史句；手动回看保留原有历史窗口和空闲恢复行为。`dev-probe.html?probe=dialogueOverlap` 可交互查看长句跨越短句、独立结束及回退。
+
+`dialogue/VisualizerDialogue.tsx` 是莫奈的句级适配层，直接调用 `monet/entry.tsx` 的 renderer，共享完整构图、封面、滚动动效和设置面板。`tuningRegistry` 将对白映射到同一个 `monet` 参数存储，字体缩放仍由莫奈入口统一应用。
+
+`dialogueTimeline.ts` 以句级 `startTime/endTime` 建立边界索引，`useDialogueTimeline` 只在句子边界或跳转时更新 React 状态。传给莫奈的是已开始字幕及两行预排版，`sentencePlayback.startedCount` 控制文本挂载边界，活动集合保留重叠高亮；`MonetLyricsRail` 在该分支整句渲染，不挂载逐字扫光/发光组件。回退时直接移除后文，避免退出动画短暂保留未来台词。滚轮和触屏回看使用莫奈原有小窗口及空闲自动跟随，点击跳转也复用同一处理器。
+
+`MonetSentenceText` 以普通文本规则换行，保留硬换行；pretext 提供初始行高，有限可见行的 ResizeObserver 按实际浏览器排版校正缓存，处理中文标点压缩与字体加载差异。回调只在行数改变时更新布局，不在播放帧里测量。整句光晕与逐词光晕共用 `buildMonetGlowShadow` 的半径、混色和强度，整句的亮起/驻留/淡出由播放 MotionValue 驱动，与扫光蒙版解耦。
 
 ### Diorama
 

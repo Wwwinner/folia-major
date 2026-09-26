@@ -21,6 +21,8 @@ src/index.tsx
 - OBS PlayerCap：`components/obs/ObsPlayerCapSourceApp.tsx`
 - Remote：`components/remote/RemoteControlApp.tsx`
 
+独立桌面字幕使用单独的 `desktop-lyrics.html` → `src/desktopLyrics.tsx` → `components/desktop-lyrics/DesktopLyricsApp.tsx`，不挂载主播放器。`useElectronPlaybackBridge` 发布主窗口时钟，`electron/desktopLyricsWindow.cjs` 管理透明置顶窗口、穿透和位置；字号/光强经 `useDesktopLyricsStore` 接入视觉配置。
+
 普通应用的主要装配关系：
 
 ```text
@@ -60,6 +62,7 @@ App.tsx
 - 本地库实体编辑：`src/components/local-library-entity/*`。
 - 命令面板：`src/components/command-palette/*`。
 - 设置和业务弹窗：`src/components/modal/*`、`src/components/modal/settings/*`。
+- 桌面代理设置：`components/modal/settings/ProxySettingsSection.tsx`；主进程校验、旧配置迁移与 Chromium 配置在 `../electron/proxySettings.cjs`，保存后重启生效。
 - 右侧 panel tabs：`src/components/panelTab/*`。
 - 复用对话框、列表、选择器和 OBS URL 控件：`src/components/shared/*`。
 - 外部显示/控制：`src/components/obs/*`、`src/components/remote/*`。
@@ -93,7 +96,7 @@ App.tsx
 - grapheme timing：`utils/lyrics/graphemeTiming.ts`。
 - 共享字体、颜色、播放身份：`utils/fontStacks.ts`、`components/visualizer/colorMix.ts`、`utils/appPlaybackGuards.ts`。
 - Visualizer 共享入口、契约和运行时：`components/visualizer/VisualizerRenderer.tsx`、`definition.ts`、`registry.tsx`、`tuningRegistry.ts`、`runtime.ts`、`VisualizerShell.tsx`。
-- 模式清单与具体入口：`components/visualizer/<mode>/entry.tsx`；当前有 `classic`、`cadenza`、`partita`、`fume`、`cappella`、`tilt`、`claddagh`、`monet`、`diorama`、`pendolo`、`sonnet`、`tempera`。
+- 模式清单与具体入口：`components/visualizer/<mode>/entry.tsx`；当前有 `classic`、`cadenza`、`partita`、`fume`、`cappella`、`tilt`、`claddagh`、`monet`、`dialogue`、`diorama`、`pendolo`、`sonnet`、`tempera`。
 - 背景 registry：`components/visualizer/backgrounds/registry.tsx`；当前 entry 有 `common`、`latent`、`monet`、`nomand`、`sora`、`url`。
 - 模式设置：优先看各模式目录的 `tuning.ts` / `*SettingsPanel.tsx`，再看 `VisPlaygroundSettingsPanel.tsx`。
 

@@ -20,6 +20,9 @@ import type {
     ProviderCatalogEntityKind,
     QrLoginMethod,
     QrLoginState,
+    HomeDiscoverySection,
+    CollectionBrowseFilter,
+    CollectionBrowseQuery,
 } from '../../types/onlineMusic';
 import { resolveProviderLyricsChorus } from '../../utils/lyrics/chorusResolver';
 import { OnlineProviderError } from '../../types/onlineMusic';
@@ -118,12 +121,12 @@ export const omni = {
                 displayName: provider.displayName,
                 shortName: provider.shortName || provider.displayName,
                 availability: provider.getAvailability?.() ?? { configured: true },
-                status: account?.status || 'unknown',
+                status: provider.capabilities.auth ? account?.status || 'unknown' : 'anonymous',
                 user: account?.user || null,
                 collections: account?.collections || [],
                 error: account?.error,
-                hydration: account?.hydration || 'loading',
-                freshness: account?.freshness || 'stale',
+                hydration: provider.capabilities.auth ? account?.hydration || 'loading' : 'ready',
+                freshness: provider.capabilities.auth ? account?.freshness || 'stale' : 'fresh',
                 lastUpdatedAt: account?.lastUpdatedAt,
             };
         });
@@ -186,6 +189,19 @@ export const omni = {
         const provider = requireOnlineMusicProvider(providerId);
         if (!providerSupports(provider, 'search') || !provider.search) return emptyPage(page.offset);
         return provider.search.searchSongs(query, page.limit, page.offset);
+    },
+
+    async searchAlbums(query: string, page: PageInput): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(async provider => {
+            if (!provider.capabilities.albumSearch || !provider.search?.searchAlbums) return emptyPage(page.offset);
+            return provider.search.searchAlbums(query, page.limit, page.offset);
+        });
+    },
+
+    async searchProviderAlbums(providerId: OmniProviderId, query: string, page: PageInput): Promise<OmniPage<OmniCollection>> {
+        const provider = requireOnlineMusicProvider(providerId);
+        if (!provider.capabilities.albumSearch || !provider.search?.searchAlbums) return emptyPage(page.offset);
+        return provider.search.searchAlbums(query, page.limit, page.offset);
     },
 
     async getLoginStatus(providerId: OmniProviderId): Promise<OmniUser | null> {
@@ -393,6 +409,25 @@ export const omni = {
 
     normalizeCachedCollection(providerId: OmniProviderId, raw: unknown, type?: string): OmniCollection | null {
         return requireOnlineMusicProvider(providerId).normalizeCollection?.(raw, type) ?? null;
+    },
+
+    async getHomeSections(page: PageInput = { limit: 20, offset: 0 }): Promise<OmniPage<HomeDiscoverySection>> {
+        return withActiveProvider(provider => provider.discovery?.getHomeSections(page.limit, page.offset)
+            ?? unsupported(provider.id, 'publicDiscovery'));
+    },
+
+    async getCollectionBrowseFilters(): Promise<CollectionBrowseFilter[]> {
+        return withActiveProvider(provider => provider.discovery?.getBrowseFilters() ?? unsupported(provider.id, 'publicDiscovery'));
+    },
+
+    async getDiscoverySectionCollections(id: string, page: PageInput = { limit: 20, offset: 0 }): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(provider => provider.discovery?.getSectionCollections?.(id, page.limit, page.offset)
+            ?? unsupported(provider.id, 'discoverySection'));
+    },
+
+    async browseCollections(query: CollectionBrowseQuery, page: PageInput = { limit: 24, offset: 0 }): Promise<OmniPage<OmniCollection>> {
+        return withActiveProvider(provider => provider.discovery?.browseCollections(query, page.limit, page.offset)
+            ?? unsupported(provider.id, 'publicDiscovery'));
     },
 
     async getHomeFeed(limit = 35): Promise<{
