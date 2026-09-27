@@ -16,6 +16,9 @@ export type SyncProviderConfig = {
     enabled: boolean;
     workerBaseUrl: string;
     authToken: string;
+    fanjiaoHistory?: boolean;
+    fanjiaoPreference?: boolean;
+    fanjiaoScope?: string;
 };
 
 export type SyncRuntimeStatus = {
@@ -104,6 +107,7 @@ export type WorkerHealthResponse = {
     ok: boolean;
     schemaVersion?: number;
     backend?: string;
+    capabilities?: { fanjiaoSync?: number };
 };
 
 export type SyncLibraryExportBundle = {

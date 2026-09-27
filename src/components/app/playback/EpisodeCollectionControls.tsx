@@ -3,6 +3,7 @@ import type { SongResult } from '../../../types';
 import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore';
 import { getEpisodeKey } from '../../../utils/episodePlayback';
 import { formatTime } from '../../../utils/appPlaybackHelpers';
+import { getEpisodeHistoryTime } from '../../../utils/episodeHistory';
 
 // 专辑中的继续收听入口；正片跳转偏好由播放底栏控制，目录和历史记录保持完整。
 export default function EpisodeCollectionControls({ tracks, onPlay }: {
@@ -11,7 +12,7 @@ export default function EpisodeCollectionControls({ tracks, onPlay }: {
     const { t } = useTranslation();
     const progress = useEpisodePlaybackStore(state => state.progress);
     const latest = tracks.filter(song => progress[getEpisodeKey(song) || '']?.position > 0 && !progress[getEpisodeKey(song) || '']?.completed)
-        .sort((a, b) => progress[getEpisodeKey(b)!].updatedAt - progress[getEpisodeKey(a)!].updatedAt)[0];
+        .sort((a, b) => getEpisodeHistoryTime(progress[getEpisodeKey(b)!]) - getEpisodeHistoryTime(progress[getEpisodeKey(a)!]))[0];
     if (!latest) return null;
     return <div className="flex min-w-0 flex-col gap-2" data-testid="episode-collection-controls">
         <button type="button" onClick={() => onPlay(latest)}

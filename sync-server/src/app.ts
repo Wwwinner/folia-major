@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { bearerAuth } from 'hono/bearer-auth';
+import fanjiaoRoutes from './fanjiaoRoutes.js';
 
 export type D1PreparedStatement = {
   bind: (...values: unknown[]) => D1PreparedStatement;
@@ -42,11 +43,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
 
-let schemaEnsured = false;
+const schemaEnsured = new WeakMap<D1Database, Promise<void>>();
 
 const ensureSchema = async (db: D1Database) => {
-  if (schemaEnsured) return;
-  await db.batch([
+  const existing = schemaEnsured.get(db);
+  if (existing) return existing;
+  const pending = db.batch([
     db.prepare(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -73,8 +75,9 @@ const ensureSchema = async (db: D1Database) => {
     `),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_themes_updated_at ON themes(updated_at)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_themes_bucket_id ON themes(bucket_id)'),
-  ]);
-  schemaEnsured = true;
+  ]).then(() => undefined).catch(error => { schemaEnsured.delete(db); throw error; });
+  schemaEnsured.set(db, pending);
+  return pending;
 };
 
 const parseThemeInput = (value: unknown) => {
@@ -313,7 +316,7 @@ app.get('/', async (c) => {
 });
 
 // API Routes
-app.get('/health', (c) => c.json({ ok: true, schemaVersion: SCHEMA_VERSION, backend: 'hono-sync' }));
+app.get('/health', (c) => c.json({ ok: true, schemaVersion: SCHEMA_VERSION, backend: 'hono-sync', capabilities: { fanjiaoSync: 1 } }));
 
 const api = new Hono<{ Bindings: Env }>();
 
@@ -517,6 +520,7 @@ api.post('/themes/list', async (c) => {
   });
 });
 
+api.route('/fanjiao', fanjiaoRoutes);
 app.route('/', api);
 
 export default app;

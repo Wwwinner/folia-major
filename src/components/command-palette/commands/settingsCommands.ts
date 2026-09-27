@@ -9,6 +9,7 @@ import { Gauge, Images, Layers3 } from 'lucide-react';
 import { latticePosterTintSurface } from '../surfaces/latticePosterTintSurface';
 import { gridViewCardsSurface } from '../surfaces/gridViewCardsSurface';
 import { reduceMotionSurface } from '../surfaces/reduceMotionSurface';
+import { fanjiaoSyncCommands } from './fanjiaoSyncCommands';
 
 // src/components/command-palette/commands/settingsCommands.ts
 // Commands in the `settings` group: settings subviews, app toggles, theme, sync, and desktop-only switches.
@@ -228,6 +229,7 @@ export const settingsCommands: CommandPaletteCommand[] = [
             return true;
         },
     },
+    ...fanjiaoSyncCommands,
     createSettingsCommand(
         'settings-local-library-watch',
         'Local folder watch settings',

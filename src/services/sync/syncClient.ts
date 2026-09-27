@@ -35,7 +35,7 @@ const buildUrl = (config: SyncProviderConfig, path: string) => (
     `${config.workerBaseUrl.replace(/\/+$/, '')}${path}`
 );
 
-const requestJson = async <T,>(
+export const requestJson = async <T,>(
     config: SyncProviderConfig,
     path: string,
     init: RequestInit = {},

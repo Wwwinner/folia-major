@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, History, Loader2, Play } from 'lucide-react';
+import { AlertCircle, History, Loader2, Play, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SongResult } from '../../../types';
 import type { OmniCollection } from '../../../types/onlineMusic';
@@ -10,6 +10,8 @@ import { useEpisodeResume } from '../../../hooks/useEpisodeResume';
 import { SidePanelList } from '../../shared/SidePanelList';
 import { useEpisodeHistory } from './useEpisodeHistory';
 import { EpisodeHistoryCard } from './EpisodeHistoryCards';
+import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore';
+import ConfirmDialog from '../../shared/ConfirmDialog';
 
 // 历史作为独立首页入口，侧栏仅展示听过的分集，点播仍使用完整专辑队列。
 export default function EpisodeHistoryPage({ providerId, isDaylight, onPlay, onOpen }: {
@@ -19,6 +21,7 @@ export default function EpisodeHistoryPage({ providerId, isDaylight, onPlay, onO
     const history = useEpisodeHistory(providerId);
     const playback = useEpisodeResume(providerId, onPlay);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [deletion, setDeletion] = useState<{ key?: string; name?: string } | null>(null);
     const [today, setToday] = useState(Date.now);
     const selected = history.allGroups.find(group => group.key === selectedKey);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,7 +55,8 @@ export default function EpisodeHistoryPage({ providerId, isDaylight, onPlay, onO
     return <section data-testid="episode-history-page" aria-label={t('episodeHistory.title')} className="relative flex min-h-0 w-full flex-1 flex-col" style={{ color: 'var(--text-primary)' }}>
         <header className="mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-3 px-6 pb-5 lg:px-10">
             <h2 className="text-lg font-semibold">{t('episodeHistory.title')}</h2>
-            <span className="text-xs opacity-65">{t('episodeHistory.count', { count: history.total })}</span>
+            <div className="flex items-center gap-3"><span className="text-xs opacity-65">{t('episodeHistory.count', { count: history.total })}</span>
+                {providerId === 'fanjiao' && history.total > 0 && <button type="button" className={buttonClass} onClick={() => setDeletion({})}>{t('episodeHistory.clear')}</button>}</div>
         </header>
         <div ref={scrollRef} {...drag.handlers} data-testid="episode-history-scroll"
             className={`min-h-0 flex-1 overflow-y-auto overscroll-contain select-none hide-scrollbar ${drag.isDragging ? 'cursor-grabbing [&_*]:cursor-grabbing' : 'cursor-grab'}`}>
@@ -81,13 +85,25 @@ export default function EpisodeHistoryPage({ providerId, isDaylight, onPlay, onO
                 items={selected?.episodes || []} itemHeight={84} isDaylight={isDaylight} className="top-14!"
                 headerLeadingActions={<div className="mb-1 text-xs opacity-70">{history.panelLoading ? t('episodeHistory.loading') : t('episodeHistory.episodes')}
                     {history.panelFailed && <button type="button" className="ml-2 underline" onClick={() => void history.hydrateAlbum(selected?.album || null)}>{t('search.retry')}</button>}</div>}
-                renderItem={(record, _index, style) => <button type="button" style={style} data-history-episode={record.song.id} disabled={Boolean(playback.busy)}
-                    onClick={() => void playback.resume(record.song)} className="flex h-full w-full items-center gap-3 rounded-xl px-3 text-left hover:bg-current/5 focus-visible:outline focus-visible:outline-2 disabled:opacity-50">
+                renderItem={(record, _index, style) => <div style={style} className="flex h-full w-full items-center gap-2">
+                    <button type="button" data-history-episode={record.song.id} disabled={Boolean(playback.busy)}
+                    onClick={() => void playback.resume(record.song)} className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left hover:bg-current/5 focus-visible:outline focus-visible:outline-2 disabled:opacity-50">
                     <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{record.song.name}</span>
                         <span className="mt-1 block text-xs opacity-70">{record.progress.completed ? t('episodeHistory.completed') : t('episodes.position', { time: formatTime(record.progress.position) })}</span>
                         <time dateTime={new Date(record.time).toISOString()} className="mt-1 block text-xs opacity-60">{timestamp(record.time)}</time></span>
                     {playback.busy === record.key ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} aria-hidden="true" />}
-                </button>} />
+                    </button>
+                    {providerId === 'fanjiao' && <button type="button" className="rounded-lg p-2 hover:bg-current/10" aria-label={t('episodeHistory.deleteNamed', { name: record.song.name })}
+                        onClick={() => setDeletion({ key: record.key, name: record.song.name })}><Trash2 size={15} /></button>}
+                </div>} />
         </div>
+        <ConfirmDialog isOpen={Boolean(deletion)} title={t(deletion?.key ? 'episodeHistory.delete' : 'episodeHistory.clear')}
+            description={deletion?.key ? t('episodeHistory.deleteDescription', { name: deletion.name }) : t('episodeHistory.clearDescription')}
+            confirmVariant="danger" isDaylight={isDaylight} onClose={() => setDeletion(null)} onConfirm={() => {
+                if (!deletion) return;
+                const store = useEpisodePlaybackStore.getState();
+                if (deletion.key) store.deleteEpisode(deletion.key); else store.clearHistory(providerId);
+                setDeletion(null);
+            }} />
     </section>;
 }

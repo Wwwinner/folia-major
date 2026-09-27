@@ -1,0 +1,24 @@
+// Shared wire contract for optional Fanjiao sync; contains no provider credentials.
+export type SyncVersion = { counter: number; device: string };
+export type EpisodeMetadata = { name: string; albumId: string; albumName: string; coverUrl: string; author: string; kind: 'main' | 'extra' | 'unknown' };
+export type EpisodeValue = { position: number; duration: number; completed: boolean; updatedAt: number; lastPlayedAt?: number; metadata?: EpisodeMetadata };
+export type FanjiaoRecord = { key: string; epoch: SyncVersion; generation: SyncVersion; version: SyncVersion; deleted: boolean; value: EpisodeValue | null };
+export type FanjiaoHistory = { epoch: SyncVersion; records: FanjiaoRecord[] };
+export type FanjiaoPreference = { version: SyncVersion; mainOnly: boolean };
+export type FanjiaoSyncData = { protocol: 1; history?: FanjiaoHistory; preference?: FanjiaoPreference | null };
+export const FANJIAO_PROTOCOL: 1;
+export const MAX_FANJIAO_BATCH: number;
+export const MAX_FANJIAO_RECORDS: number;
+export const MAX_FANJIAO_BODY: number;
+export const ZERO_VERSION: SyncVersion;
+export function isFanjiaoKey(value: unknown): value is string;
+export function compareVersion(a: SyncVersion, b: SyncVersion): number;
+export function versionKey(version: SyncVersion): string;
+export function recordOrder(record: FanjiaoRecord): string;
+export function recordPayload(record: FanjiaoRecord): string;
+export function parseVersion(value: unknown): SyncVersion | null;
+export function parseEpisodeValue(value: unknown): EpisodeValue | null;
+export function parseFanjiaoRecord(value: unknown): FanjiaoRecord | null;
+export function parseFanjiaoSyncData(value: unknown, limit?: number): FanjiaoSyncData | null;
+export function mergeFanjiaoHistory(a: FanjiaoHistory, b: FanjiaoHistory): FanjiaoHistory;
+export function mergeFanjiaoPreference(a: FanjiaoPreference | null, b: FanjiaoPreference | null): FanjiaoPreference | null;

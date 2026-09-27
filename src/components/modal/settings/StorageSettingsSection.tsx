@@ -2,7 +2,7 @@ import React from 'react';
 import { AudioWaveform, Check, Cloud, Command, Database, Disc3, Download, FolderOpen, HardDrive, Layers, Loader2, Pencil, PlayCircle, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Theme } from '../../../types';
-import { getSyncConfig, getSyncStatus, saveSyncConfig, setSyncStatus, subscribeSyncConfig, subscribeSyncStatus } from '../../../services/sync/syncConfig';
+import { getSyncConfig, getSyncStatus, saveSyncConfig, setSyncStatus, subscribeSyncConfig, subscribeSyncStatus, setFanjiaoSyncStatus } from '../../../services/sync/syncConfig';
 import { exportSyncLibraryBundle, importSyncLibraryBundle, isSyncLibraryExportBundle, syncNow, testSyncProviderConnection } from '../../../services/sync/syncCoordinator';
 import { createSyncLibraryZipBlob, readSyncLibraryZipFile } from '../../../services/sync/syncArchive';
 import { SYNC_PROVIDER, type SyncProviderConfig, type SyncRuntimeStatus } from '../../../services/sync/syncTypes';
@@ -12,6 +12,7 @@ import { CustomSelect } from '../../shared/CustomSelect';
 import LocalLibraryWatchSection from './LocalLibraryWatchSection';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
 import SettingsSectionHeading from './navigation/SettingsSectionHeading';
+import FanjiaoSyncSettings from './FanjiaoSyncSettings';
 
 // src/components/modal/settings/StorageSettingsSection.tsx
 // Shared storage and media cache settings used by the main options page and storage subview.
@@ -124,8 +125,15 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
     };
 
     const handleSaveSyncConfig = () => {
-        saveSyncConfig(draftSyncConfig);
-        setSyncConfig(getSyncConfig());
+        try {
+            saveSyncConfig(draftSyncConfig);
+            setSyncConfig(getSyncConfig());
+            return true;
+        } catch {
+            setFanjiaoSyncStatus({ state: 'error', lastError: 'fanjiaoSyncStorageUnavailable' });
+            setSyncSummaryMsg(t('ui.storage.fanjiaoSyncStorageUnavailable'));
+            return false;
+        }
     };
 
     const handleTestSync = async () => {
@@ -160,9 +168,7 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
     };
 
     const handleSyncNow = async () => {
-        if (syncConfigDirty) {
-            handleSaveSyncConfig();
-        }
+        if (syncConfigDirty && !handleSaveSyncConfig()) return;
         setSyncAction('syncing');
         setSyncSummaryMsg(null);
         try {
@@ -176,9 +182,7 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
     };
 
     const handleSyncSettings = async () => {
-        if (syncConfigDirty) {
-            handleSaveSyncConfig();
-        }
+        if (syncConfigDirty && !handleSaveSyncConfig()) return;
         setSyncAction('syncingSettings');
         setSyncSummaryMsg(null);
         try {
@@ -413,6 +417,9 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
                                 {t('options.syncVisualSettings')}
                             </button>
                         </div>
+
+                        <FanjiaoSyncSettings config={draftSyncConfig} busy={syncAction !== 'idle'}
+                            onChange={updateDraftSyncConfig} onSave={handleSaveSyncConfig} />
 
                         <input
                             ref={syncImportInputRef}

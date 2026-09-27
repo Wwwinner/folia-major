@@ -7,12 +7,16 @@ const SYNC_CONFIG_STORAGE_KEY = 'folia_sync_config_v1';
 const SYNC_STATUS_STORAGE_KEY = 'folia_sync_status_v1';
 const SYNC_CONFIG_EVENT = 'folia-sync-config-changed';
 const SYNC_STATUS_EVENT = 'folia-sync-status-changed';
+const FANJIAO_STATUS_KEY = 'folia_fanjiao_sync_status_v1';
 
 const DEFAULT_CONFIG: SyncProviderConfig = {
     provider: SYNC_PROVIDER,
     enabled: false,
     workerBaseUrl: '',
     authToken: '',
+    fanjiaoHistory: false,
+    fanjiaoPreference: false,
+    fanjiaoScope: '',
 };
 
 const DEFAULT_STATUS: SyncRuntimeStatus = {
@@ -23,18 +27,20 @@ const DEFAULT_STATUS: SyncRuntimeStatus = {
 
 const isBrowser = () => typeof window !== 'undefined';
 
+// Device IDs are not credentials. getRandomValues also works on HTTP-hosted web clients.
+export const createSyncIdentity = () => globalThis.crypto?.randomUUID?.()
+    ?? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
+
 const readJson = <T,>(key: string, fallback: T): T => {
     if (!isBrowser()) {
         return fallback;
     }
 
-    const stored = window.localStorage.getItem(key);
-    if (!stored) {
-        return fallback;
-    }
-
     try {
-        return JSON.parse(stored) as T;
+        const stored = window.localStorage?.getItem(key);
+        if (!stored) return fallback;
+        const value = JSON.parse(stored);
+        return value && typeof value === 'object' && !Array.isArray(value) ? value as T : fallback;
     } catch {
         return fallback;
     }
@@ -55,6 +61,9 @@ export const getSyncConfig = (): SyncProviderConfig => {
         workerBaseUrl: typeof stored.workerBaseUrl === 'string' ? stored.workerBaseUrl.trim() : '',
         authToken: typeof stored.authToken === 'string' ? stored.authToken.trim() : '',
         enabled: Boolean(stored.enabled),
+        fanjiaoHistory: stored.fanjiaoHistory === true,
+        fanjiaoPreference: stored.fanjiaoPreference === true,
+        fanjiaoScope: typeof stored.fanjiaoScope === 'string' ? stored.fanjiaoScope : '',
     };
 };
 
@@ -63,12 +72,20 @@ export const saveSyncConfig = (config: SyncProviderConfig) => {
         return;
     }
 
+    const previous = getSyncConfig();
+    const workerBaseUrl = config.workerBaseUrl.trim().replace(/\/+$/, '');
+    const authToken = config.authToken.trim();
+    const identityChanged = workerBaseUrl !== previous.workerBaseUrl.replace(/\/+$/, '') || authToken !== previous.authToken;
     window.localStorage.setItem(SYNC_CONFIG_STORAGE_KEY, JSON.stringify({
         provider: SYNC_PROVIDER,
         enabled: config.enabled,
-        workerBaseUrl: config.workerBaseUrl.trim().replace(/\/+$/, ''),
-        authToken: config.authToken.trim(),
+        workerBaseUrl,
+        authToken,
+        fanjiaoHistory: config.fanjiaoHistory === true,
+        fanjiaoPreference: config.fanjiaoPreference === true,
+        fanjiaoScope: identityChanged ? createSyncIdentity() : previous.fanjiaoScope || 'local',
     }));
+    if (identityChanged) setFanjiaoSyncStatus(DEFAULT_STATUS);
     emitEvent(SYNC_CONFIG_EVENT);
 };
 
@@ -77,6 +94,22 @@ export const isSyncConfigured = (config = getSyncConfig()) => (
 );
 
 export const getSyncStatus = (): SyncRuntimeStatus => readJson(SYNC_STATUS_STORAGE_KEY, DEFAULT_STATUS);
+
+let fanjiaoRuntimeStatus: SyncRuntimeStatus | null = null;
+export const getFanjiaoSyncStatus = (): SyncRuntimeStatus => {
+    if (!fanjiaoRuntimeStatus) {
+        const saved = readJson<SyncRuntimeStatus>(FANJIAO_STATUS_KEY, DEFAULT_STATUS);
+        fanjiaoRuntimeStatus = saved.state === 'syncing' ? { ...saved, state: 'idle' } : saved;
+    }
+    return fanjiaoRuntimeStatus;
+};
+export const setFanjiaoSyncStatus = (patch: Partial<SyncRuntimeStatus>) => {
+    if (!isBrowser()) return;
+    fanjiaoRuntimeStatus = { ...getFanjiaoSyncStatus(), ...patch };
+    try { window.localStorage.setItem(FANJIAO_STATUS_KEY, JSON.stringify(fanjiaoRuntimeStatus)); }
+    catch { /* Status persistence must not hide a recoverable data-storage failure. */ }
+    emitEvent(SYNC_STATUS_EVENT);
+};
 
 export const setSyncStatus = (patch: Partial<SyncRuntimeStatus>) => {
     if (!isBrowser()) {

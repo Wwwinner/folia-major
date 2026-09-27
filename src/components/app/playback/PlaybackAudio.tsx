@@ -19,8 +19,10 @@ const PlaybackAudio = forwardRef<HTMLAudioElement, AudioHTMLAttributes<HTMLAudio
     // 先清理进度记录器，再销毁 HLS；不能用销毁后归零的媒体时间覆盖旧集。
     useLayoutEffect(() => {
         if (!elementRef.current || !episodeSong || !episodeKey || !src) return;
-        return createEpisodeProgressRecorder(elementRef.current, episodeSong, src,
+        const endSession = useEpisodePlaybackStore.getState().beginSession(episodeKey);
+        const stopRecording = createEpisodeProgressRecorder(elementRef.current, episodeSong, src,
             useEpisodePlaybackStore.getState().saveProgress);
+        return () => { stopRecording(); endSession(); };
     }, [episodeKey, src]);
     useLayoutEffect(() => {
         const element = elementRef.current;

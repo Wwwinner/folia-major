@@ -16,6 +16,8 @@ import { parseSyncLibraryExportBundle } from './syncSchema';
 import type { SyncLibraryExportBundle, SyncRemoteState } from './syncTypes';
 import { SYNC_SCHEMA_VERSION } from './syncTypes';
 
+export { canSyncFanjiao, syncFanjiaoNow } from './fanjiaoSyncCoordinator';
+
 // src/services/sync/syncCoordinator.ts
 // Coordinates startup theme sync and user-triggered manual sync commands.
 

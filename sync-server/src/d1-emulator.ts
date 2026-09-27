@@ -3,6 +3,7 @@ import type { D1Database, D1PreparedStatement } from './app.js';
 
 export class D1Emulator implements D1Database {
   private db: Database.Database;
+  private statements = new WeakMap<D1PreparedStatement, () => unknown>();
 
   constructor(filename: string) {
     this.db = new Database(filename);
@@ -10,7 +11,9 @@ export class D1Emulator implements D1Database {
   }
 
   prepare(query: string): D1PreparedStatement {
-    const createBoundStatement = (boundValues: unknown[]): D1PreparedStatement => ({
+    const createBoundStatement = (boundValues: unknown[]): D1PreparedStatement => {
+      const execute = () => this.db.prepare(query).run(...boundValues);
+      const statement: D1PreparedStatement = {
       bind: (...values: unknown[]) => createBoundStatement(values),
       first: async <T = Record<string, unknown>>() => {
         const stmt = this.db.prepare(query);
@@ -23,11 +26,13 @@ export class D1Emulator implements D1Database {
         return { results };
       },
       run: async () => {
-        const stmt = this.db.prepare(query);
-        stmt.run(...boundValues);
+        execute();
         return {};
       }
-    });
+      };
+      this.statements.set(statement, execute);
+      return statement;
+    };
     return createBoundStatement([]);
   }
 
@@ -39,11 +44,15 @@ export class D1Emulator implements D1Database {
         // D1 batch executes them. We can just call run(). Wait, run is async in our emulator.
         // Let's implement a hack to expose the sync version for batch transaction.
         // For our usage, batch only uses `run` conceptually.
-        stmt.run();
-        results.push({});
+        // Execute synchronously so a rejected statement really rolls back the enclosing transaction.
+        const execute = this.statements.get(stmt);
+        if (!execute) throw new Error('Statement belongs to a different database');
+        results.push(execute());
       }
     });
     transaction();
     return results;
   }
+
+  close() { this.db.close(); }
 }
