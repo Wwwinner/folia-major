@@ -1,4 +1,10 @@
-// 散雾跟随音频时钟；短句在自身结束前显露完整，暂停、回退不依赖另一个动画计时器。
+// 每句开始前一秒在原排版位置凝聚；远期占位不显示，暂停和回退随播放时钟。
+export function dialogueMistAnticipation(time: number, start: number) {
+    const phase = Math.min(1, Math.max(0, time - start + 1));
+    return phase * phase * (3 - 2 * phase);
+}
+
+// 短句在自身结束前显露完整，不另建动画计时器。
 export function dialogueMistProgress(time: number, start: number, end: number) {
     if (time < start) return 0;
     const duration = Math.min(0.65, Math.max(0, end - start) * 0.35);

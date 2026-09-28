@@ -39,6 +39,7 @@ export interface MonetMeasuredLineLayout {
     visibleTextLineCount: number;
     textHeightPx: number;
     textContentHeightPx: number;
+    textContentWidthPx: number;
     textPaddingTopPx: number;
     textPaddingBottomPx: number;
     translationLineCount: number;
@@ -538,6 +539,7 @@ export const measureMonetLineLayout = ({
         visibleTextLineCount,
         textHeightPx,
         textContentHeightPx,
+        textContentWidthPx: Math.min(Math.max(0, maxWidthPx), maxLineWidthPx),
         textPaddingTopPx,
         textPaddingBottomPx,
         translationLineCount,

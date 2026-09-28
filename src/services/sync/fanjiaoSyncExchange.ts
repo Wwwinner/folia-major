@@ -44,15 +44,6 @@ export async function exchangeFanjiaoData(config: SyncProviderConfig, local: Fan
         } while (cursor !== null || !history);
         remote.history = history;
     }
-    if (local.preference !== undefined) {
-        if (local.preference) {
-            const response = await request<{ ok?: boolean; protocol?: number }>('/fanjiao/preference', 'PUT', { protocol: 1, preference: local.preference });
-            if (response?.ok !== true || response.protocol !== 1) throw new Error('fanjiaoSyncInvalidData');
-        }
-        const parsed = parseFanjiaoSyncData(await request('/fanjiao/preference'));
-        if (!parsed || parsed.preference === undefined || parsed.history !== undefined) throw new Error('fanjiaoSyncInvalidData');
-        remote.preference = parsed.preference;
-    }
     return remote;
 }
 

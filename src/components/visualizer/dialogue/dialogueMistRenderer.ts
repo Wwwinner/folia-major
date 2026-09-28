@@ -13,7 +13,7 @@ export function createDialogueMistRenderer(canvas: HTMLCanvasElement) {
     });
     gl.clearColor(0, 0, 0, 0);
     return {
-        draw(width: number, height: number, time: number, reveal: number, color: number[]) {
+        draw(width: number, height: number, time: number, reveal: number, color: number[], padding: number) {
             const scale = Math.min(1, 384 / Math.max(width, 1), 128 / Math.max(height, 1));
             const w = Math.max(2, Math.round(width * scale)), h = Math.max(2, Math.round(height * scale));
             if (canvas.width !== w) canvas.width = w;
@@ -22,7 +22,9 @@ export function createDialogueMistRenderer(canvas: HTMLCanvasElement) {
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.useProgram(program.program);
             twgl.setBuffersAndAttributes(gl, program, buffer);
-            twgl.setUniforms(program, { u_time: time, u_reveal: reveal, u_color: color });
+            const coreWidth = Math.max(1, width - padding * 2), coreHeight = Math.max(1, height - padding * 2);
+            twgl.setUniforms(program, { u_time: time, u_reveal: reveal, u_color: color,
+                u_aspect: coreWidth / coreHeight, u_viewScale: [width / coreWidth, height / coreHeight] });
             twgl.drawBufferInfo(gl, buffer);
         },
         destroy() {

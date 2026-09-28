@@ -1,9 +1,9 @@
 import { test, expect } from './fixtures';
 
-// Verify opt-in controls, actionable errors and deletion using the production settings and history components.
+// Verify one-click history sync, the shared action row, actionable errors and history deletion.
 test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-        localStorage.setItem('folia_sync_config_v1', JSON.stringify({ provider: 'sync-server', enabled: true, workerBaseUrl: 'https://sync.example.com', authToken: 'fixture-token' }));
+        localStorage.setItem('folia_sync_config_v1', JSON.stringify({ provider: 'sync-server', enabled: true, workerBaseUrl: 'https://sync.example.com', authToken: 'fixture-token', fanjiaoHistory: false, fanjiaoPreference: false }));
         localStorage.setItem('folia_episode_progress_v1', JSON.stringify({ 'online:fanjiao:1': {
             position: 627, duration: 1200, completed: false, updatedAt: 100, lastPlayedAt: 90,
             metadata: { name: 'Episode one', albumId: '7', albumName: 'Drama', author: 'Studio', coverUrl: '', kind: 'main' },
@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
     });
 });
 
-test('defaults off, transfers only the chosen category and preserves data when disabled', async ({ page, mount }) => {
+test('syncs history with one click from the rightmost action without category controls', async ({ page, mount }, testInfo) => {
     const calls: string[] = [];
     await page.route('https://sync.example.com/**', async route => {
         const request = route.request(); calls.push(`${request.method()} ${new URL(request.url()).pathname}`);
@@ -21,29 +21,33 @@ test('defaults off, transfers only the chosen category and preserves data when d
         await route.fulfill({ json: body });
     });
     const root = await mount('fanjiaoSync');
-    const section = root.getByTestId('fanjiao-sync-settings');
-    await expect(section.getByRole('checkbox')).toHaveCount(2);
-    for (const checkbox of await section.getByRole('checkbox').all()) await expect(checkbox).not.toBeChecked();
-    await expect(section.getByRole('button', { name: 'Sync Fanjiao data' })).toBeDisabled();
-    await section.getByRole('checkbox', { name: /Listening history and resume/ }).check();
+    const section = root.locator('[data-settings-anchor="r2Sync"]');
+    await expect(section.getByRole('checkbox')).toHaveCount(0);
+    await expect(section.getByText('Playback preference', { exact: true })).toHaveCount(0);
+    const buttons = section.getByTestId('sync-actions').getByRole('button');
+    await expect(buttons).toHaveCount(3);
+    await expect(buttons.nth(2)).toHaveText('Sync Fanjiao data');
+    const layout = await buttons.evaluateAll(elements => elements.map(element => ({ x: element.getBoundingClientRect().x, y: element.getBoundingClientRect().y })));
+    expect(layout[2].x).toBeGreaterThan(layout[1].x);
+    expect(layout[2].y).toBe(layout[0].y);
+    await expect(buttons.nth(2)).not.toHaveCSS('color', await buttons.nth(1).evaluate(element => getComputedStyle(element).color));
+    await expect(buttons.nth(2)).toBeEnabled();
     await section.getByRole('button', { name: 'Sync Fanjiao data' }).click();
     await expect(section.getByRole('status')).toContainText('Fanjiao sync completed');
     expect(calls).toEqual(['GET /health', 'POST /fanjiao/history', 'GET /fanjiao/history']);
-    await section.getByRole('checkbox', { name: /Listening history and resume/ }).uncheck();
-    await root.getByRole('button', { name: 'Save choices' }).click();
-    await expect(section.getByRole('button', { name: 'Sync Fanjiao data' })).toBeDisabled();
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('folia_episode_progress_v1')!)['online:fanjiao:1'].position)).toBe(627);
+    await section.screenshot({ path: testInfo.outputPath('sync-desktop.png') });
 });
 
-test('shows an upgrade hint for an old server and fits a narrow window', async ({ page, mount }) => {
+test('shows an upgrade hint for an old server and fits a narrow window', async ({ page, mount }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.route('https://sync.example.com/**', route => route.fulfill({ json: { ok: true, schemaVersion: 1 } }));
     const root = await mount('fanjiaoSync');
-    await root.getByRole('checkbox', { name: /Playback preference/ }).check();
     await root.getByRole('button', { name: 'Sync Fanjiao data' }).click();
-    await expect(root.getByRole('alert')).toContainText('Update your sync server');
+    const section = root.locator('[data-settings-anchor="r2Sync"]');
+    await expect(section.getByRole('status')).toContainText('Update your sync server');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: 'test-results/fanjiao-sync-mobile.png' });
+    await section.screenshot({ path: testInfo.outputPath('sync-mobile.png') });
 });
 
 test('confirms history clearing and persists a clear operation without playing media', async ({ page, mount }) => {
@@ -74,9 +78,10 @@ test('deletes one episode through the history side panel', async ({ page, mount 
     expect(journal.data.history.records[0]).toMatchObject({ key: 'online:fanjiao:1', deleted: true, value: null });
 });
 
-test('shows a storage error before uploading when choices cannot be saved', async ({ page, mount }) => {
+test('shows a storage error before uploading when the server config cannot be saved', async ({ page, mount }) => {
     const root = await mount('fanjiaoSync');
-    await root.getByRole('checkbox', { name: /Listening history and resume/ }).check();
+    const section = root.locator('[data-settings-anchor="r2Sync"]');
+    await section.locator('input[type="url"]').fill('https://changed.example.com');
     await page.evaluate(() => {
         const set = Storage.prototype.setItem;
         Storage.prototype.setItem = function (key, value) {
@@ -85,5 +90,5 @@ test('shows a storage error before uploading when choices cannot be saved', asyn
         };
     });
     await root.getByRole('button', { name: 'Sync Fanjiao data' }).click();
-    await expect(root.getByRole('alert')).toContainText('Free some storage');
+    await expect(section.getByRole('status')).toContainText('Free some storage');
 });

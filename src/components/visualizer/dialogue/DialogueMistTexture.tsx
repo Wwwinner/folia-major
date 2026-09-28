@@ -4,8 +4,9 @@ import { parseColorChannels } from '../colorMix';
 import { createDialogueMistRenderer } from './dialogueMistRenderer';
 
 // 时钟变化才请求绘制，局部最多 30fps；暂停、离屏、隐藏和散雾完成后没有常驻绘制循环。
-export function DialogueMistTexture({ currentTime, progress, color, seed }: {
-    currentTime: MotionValue<number>; progress: MotionValue<number>; color: string; seed: number;
+export function DialogueMistTexture({ currentTime, progress, opacity, color, seed, padding }: {
+    currentTime: MotionValue<number>; progress: MotionValue<number>; opacity: MotionValue<number>; color: string; seed: number;
+    padding: number;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const colorRef = useRef([1, 1, 1]);
@@ -24,19 +25,20 @@ export function DialogueMistTexture({ currentTime, progress, color, seed }: {
         const cancel = () => { if (frame) cancelAnimationFrame(frame); frame = 0; };
         const draw = (timestamp: number) => {
             frame = 0;
-            if (disposed || !renderer || !visible || document.hidden || progress.get() >= 1) return;
+            if (disposed || !renderer || !visible || document.hidden || opacity.get() <= 0 || progress.get() >= 1) return;
             if (timestamp - lastDraw < 1000 / 30) { frame = requestAnimationFrame(draw); return; }
-            renderer.draw(width, height, currentTime.get() + seed * 19.731, progress.get(), colorRef.current);
+            renderer.draw(width, height, currentTime.get() + seed * 19.731, progress.get(), colorRef.current, padding);
             canvas.dataset.mistFrame = String(++draws);
             canvas.dataset.mistRenderer = 'webgl';
             lastDraw = timestamp;
         };
         const invalidate = () => {
-            if (!disposed && renderer && !frame && visible && !document.hidden && progress.get() < 1) frame = requestAnimationFrame(draw);
+            if (!disposed && renderer && !frame && visible && !document.hidden && opacity.get() > 0 && progress.get() < 1) frame = requestAnimationFrame(draw);
         };
         invalidateRef.current = invalidate;
         const unsubscribeTime = currentTime.on('change', invalidate);
         const unsubscribeProgress = progress.on('change', () => { if (progress.get() >= 1) cancel(); else invalidate(); });
+        const unsubscribeOpacity = opacity.on('change', value => { if (value <= 0) cancel(); else invalidate(); });
         const resize = new ResizeObserver(entries => {
             const bounds = entries[0]?.contentRect;
             if (bounds && (width !== bounds.width || height !== bounds.height)) {
@@ -58,13 +60,14 @@ export function DialogueMistTexture({ currentTime, progress, color, seed }: {
         invalidate();
         return () => {
             disposed = true; cancel(); invalidateRef.current = () => {};
-            unsubscribeTime(); unsubscribeProgress(); resize.disconnect(); intersection.disconnect();
+            unsubscribeTime(); unsubscribeProgress(); unsubscribeOpacity(); resize.disconnect(); intersection.disconnect();
             document.removeEventListener('visibilitychange', visibility);
             canvas.removeEventListener('webglcontextlost', lost);
             canvas.removeEventListener('webglcontextrestored', restored);
             renderer?.destroy();
         };
-    }, [currentTime, progress, seed]);
+    }, [currentTime, progress, opacity, seed, padding]);
     return <canvas ref={canvasRef} aria-hidden="true" data-dialogue-mist-texture
-        className="absolute inset-0 block h-full w-full" />;
+        className="absolute block" style={{ left: -padding, top: -padding,
+            width: `calc(100% + ${padding * 2}px)`, height: `calc(100% + ${padding * 2}px)` }} />;
 }

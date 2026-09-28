@@ -22,12 +22,16 @@ for (const width of [1100, 390]) {
                     const style = getComputedStyle(node);
                     const text = node.querySelector('[data-dialogue-reveal] > div');
                     const fog = node.querySelector('[data-dialogue-mist]');
+                    const slot = node.querySelector('[data-dialogue-reveal]');
                     return { time: Number.parseFloat(document.querySelector('output')!.textContent!),
                         top: node.getBoundingClientRect().top, scale: new DOMMatrixReadOnly(style.transform).a,
                         opacity: Number(style.opacity), hasText: Boolean(node.querySelector('[data-monet-sentence-text]')),
                         innerTransform: text ? getComputedStyle(text).transform : null,
                         textOpacity: text ? Number(getComputedStyle(text).opacity) : null,
                         nextTop: next.getBoundingClientRect().top,
+                        waitingGap: next.getBoundingClientRect().top - node.getBoundingClientRect().bottom,
+                        mistOffset: fog && slot ? fog.getBoundingClientRect().top + fog.getBoundingClientRect().height / 2
+                            - slot.getBoundingClientRect().top - slot.getBoundingClientRect().height / 2 : null,
                         mistOpacity: fog ? Number(getComputedStyle(fog).opacity) : null };
                 };
                 const before = sample();
@@ -54,6 +58,9 @@ for (const width of [1100, 390]) {
                 expect(result.sameNextRow && result.sameNextMist).toBe(true);
                 expect(result.nextHasText).toBe(false);
                 expect(result.before.nextTop).toBeGreaterThan(result.before.top + 20);
+                expect(result.before.waitingGap).toBeGreaterThanOrEqual(0);
+                expect(result.before.waitingGap).toBeLessThan(40);
+                expect(result.frames.every(frame => Math.abs(frame.mistOffset ?? Infinity) < 0.5)).toBe(true);
                 expect(result.before.nextTop - result.frames.at(-1)!.nextTop).toBeGreaterThan(20);
                 expect(result.before.hasText).toBe(false);
                 expect(result.frames.filter(frame => frame.time < 6.99).every(frame => !frame.hasText)).toBe(true);

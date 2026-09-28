@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Line } from '../../../src/types';
 import { buildMonetVisibleLineEntries } from '../../../src/components/visualizer/monet/monetLyricsModel';
-import { centerDialogueActiveGroup, fitDialogueActiveGroup, positionDialogueMistQueue, retainDialogueActiveEntries } from '../../../src/components/visualizer/dialogue/dialogueRailEntries';
+import { centerDialogueActiveGroup, fitDialogueActiveGroup, retainDialogueActiveEntries } from '../../../src/components/visualizer/dialogue/dialogueRailEntries';
 import { buildDialogueTimeline, getDialogueSnapshot } from '../../../src/components/visualizer/dialogue/dialogueTimeline';
 
 // 窗口保留和排版分别回归，防止“仍在 DOM 中但已被历史顶出视野”的假修复。
@@ -28,14 +28,6 @@ describe('dialogue overlap window', () => {
         expect(after.map(entry => entry.status)).toEqual(['active', 'active', 'waiting']);
         expect(before[1].key).toBe(after[1].key);
         expect(before[2].key).toBe(after[2].key);
-    });
-    it('places the second mist near the lower fade without moving active rows or overlapping tall cues', () => {
-        const entries = ['active', 'waiting', 'waiting'].map((status, index) => ({ status, y: 200 + index * 60, scaledHeight: 50 }));
-        const positioned = positionDialogueMistQueue(entries, 500);
-        expect(positioned[0]).toBe(entries[0]);
-        expect(positioned[1]).toBe(entries[1]);
-        expect(positioned[2].y).toBeGreaterThan(400);
-        expect(positionDialogueMistQueue([{ ...entries[0] }, { ...entries[1], y: 470 }, { ...entries[2], y: 530 }], 500)[2].y).toBe(530);
     });
     it('keeps older active cues beyond Monet’s normal window without duplicating them', () => {
         const entries = visibleAt(16.5);

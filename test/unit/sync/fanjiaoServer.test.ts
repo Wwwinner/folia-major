@@ -83,7 +83,7 @@ describe('Fanjiao server', () => {
     });
 });
 
-it('syncs two isolated clients through HTTP, including paging, offline deletion, replay and independent preference sync', async () => {
+it('syncs two isolated clients through HTTP, including paging, offline deletion, replay and clearing', async () => {
     server = createServer(async (incoming, outgoing) => {
         const chunks: Buffer[] = []; for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
         const headers = new Headers(); for (const [key, value] of Object.entries(incoming.headers)) if (value) headers.set(key, Array.isArray(value) ? value.join(',') : value);
@@ -95,10 +95,10 @@ it('syncs two isolated clients through HTTP, including paging, offline deletion,
     const config = { provider: 'sync-server' as const, enabled: true, workerBaseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, authToken: 'fixture-token' };
     const client = () => {
         const entries = new Map<string, string>();
-        return new FanjiaoLocalState({ getItem: key => entries.get(key) ?? null, setItem: (key, value) => { entries.set(key, value); } }, crypto.randomUUID(), {}, true);
+        return new FanjiaoLocalState({ getItem: key => entries.get(key) ?? null, setItem: (key, value) => { entries.set(key, value); } }, crypto.randomUUID(), {});
     };
     const a = client(), b = client();
-    const sync = async (state: FanjiaoLocalState, history = true, preference = false) => state.merge(await exchangeFanjiaoData({ ...config }, state.export(history, preference), () => {}));
+    const sync = async (state: FanjiaoLocalState) => state.merge(await exchangeFanjiaoData({ ...config }, state.export(), () => {}));
     a.save(key, value); b.save('online:fanjiao:2', value);
     for (let n = 3; n <= MAX_FANJIAO_BATCH + 3; n++) a.save(`online:fanjiao:${n}`, value);
     await sync(a); await sync(b); await sync(a);
@@ -109,8 +109,6 @@ it('syncs two isolated clients through HTTP, including paging, offline deletion,
     expect(b.history.records.find(row => row.key === key)?.deleted).toBe(true);
     b.reset(key, { ...value, position: 0 }); await sync(b); await sync(a);
     expect(a.history.records.find(row => row.key === key)?.value?.position).toBe(0);
-    a.setPreference(false); await sync(a, false, true); await sync(b, false, true);
-    expect(b.preference?.mainOnly).toBe(false);
     a.clear(); await sync(a);
     b.save('online:fanjiao:2', { ...value, position: 800 }); await sync(b);
     expect(b.history.records).toEqual([]);

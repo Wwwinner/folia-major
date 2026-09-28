@@ -5,7 +5,7 @@ import { isEpisodeSource } from '../services/playbackMediaSource';
 import { episodeMetadataFromSong, getEpisodeHistoryTime, normalizeEpisodeProgress } from '../utils/episodeHistory';
 import type { FanjiaoSyncData } from '../../shared/fanjiaoSync.mjs';
 import { beginFanjiaoSession, endFanjiaoSession, isFanjiaoSessionHidden, recordFanjiaoProgress, resetFanjiaoEpisode,
-    clearFanjiaoHistory, recordFanjiaoPreference, exportFanjiaoData, mergeFanjiaoData, persistFanjiaoOperation, restoreFanjiaoState, hydrateFanjiaoMetadata } from '../services/sync/fanjiaoPlaybackBridge';
+    clearFanjiaoHistory, exportFanjiaoData, mergeFanjiaoData, persistFanjiaoOperation, restoreFanjiaoState, hydrateFanjiaoMetadata } from '../services/sync/fanjiaoPlaybackBridge';
 
 // 逐集收听位置属于本机历史；同步写入轻量记录，避免退出时等待异步数据库事务。
 export const EPISODE_PROGRESS_STORAGE_KEY = 'folia_episode_progress_v1';
@@ -48,16 +48,15 @@ interface EpisodePlaybackState {
     deleteEpisode: (key: string) => void;
     clearHistory: (providerId: string) => void;
     beginSession: (key: string) => () => void;
-    exportSyncData: (history: boolean, preference: boolean) => FanjiaoSyncData;
+    exportSyncData: () => FanjiaoSyncData;
     mergeSyncData: (data: FanjiaoSyncData) => void;
 }
-const restored = restoreFanjiaoState(readProgress(), readMainOnly());
+const restored = restoreFanjiaoState(readProgress());
 export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) => ({
-    mainOnly: restored.mainOnly,
-    progress: Object.fromEntries(Object.entries(restored.progress).sort((a, b) => getEpisodeHistoryTime(b[1]) - getEpisodeHistoryTime(a[1])).slice(0, MAX_ENTRIES)),
+    mainOnly: readMainOnly(),
+    progress: Object.fromEntries(Object.entries(restored).sort((a, b) => getEpisodeHistoryTime(b[1]) - getEpisodeHistoryTime(a[1])).slice(0, MAX_ENTRIES)),
     toggleMainOnly: () => {
         const mainOnly = !get().mainOnly;
-        persistFanjiaoOperation(() => recordFanjiaoPreference(get().progress, get().mainOnly, mainOnly));
         persist(MAIN_ONLY_KEY, String(mainOnly));
         set({ mainOnly });
     },
@@ -66,7 +65,7 @@ export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) =
         const previous = get().progress[key];
         const next = normalizeEpisodeProgress({ ...previous, ...value, metadata: value.metadata ?? previous?.metadata })!;
         if (next.lastPlayedAt === 0 && previous) next.lastPlayedAt = getEpisodeHistoryTime(previous);
-        persistFanjiaoOperation(() => recordFanjiaoProgress(key, next, get().progress, get().mainOnly));
+        persistFanjiaoOperation(() => recordFanjiaoProgress(key, next, get().progress));
         const progress = persistProgress({ ...get().progress, [key]: next });
         set({ progress });
     },
@@ -77,7 +76,7 @@ export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) =
             const key = getEpisodeKey(song);
             const metadata = episodeMetadataFromSong(song);
             if (!key || !metadata || !progress[key] || progress[key].metadata) continue;
-            persistFanjiaoOperation(() => hydrateFanjiaoMetadata(key, metadata, get().progress, get().mainOnly));
+            persistFanjiaoOperation(() => hydrateFanjiaoMetadata(key, metadata, get().progress));
             progress[key] = { ...progress[key], metadata }; changed = true;
         }
         if (!changed) return;
@@ -95,34 +94,32 @@ export const useEpisodePlaybackStore = create<EpisodePlaybackState>((set, get) =
             progress[key] = { ...previous, position: 0, duration, completed: false,
                 updatedAt: previous?.updatedAt ?? 0, lastPlayedAt: previous ? getEpisodeHistoryTime(previous) : 0,
                 metadata: previous?.metadata ?? episodeMetadataFromSong(song) };
-            persistFanjiaoOperation(() => resetFanjiaoEpisode(key, progress[key], get().progress, get().mainOnly));
+            persistFanjiaoOperation(() => resetFanjiaoEpisode(key, progress[key], get().progress));
         } else {
             // Without a duration, retain a reset fence until the first actual playback supplies valid progress.
-            persistFanjiaoOperation(() => resetFanjiaoEpisode(key, null, get().progress, get().mainOnly));
+            persistFanjiaoOperation(() => resetFanjiaoEpisode(key, null, get().progress));
         }
         persist(EPISODE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
         set({ progress });
     },
     deleteEpisode: key => {
-        persistFanjiaoOperation(() => resetFanjiaoEpisode(key, null, get().progress, get().mainOnly));
+        persistFanjiaoOperation(() => resetFanjiaoEpisode(key, null, get().progress));
         const progress = { ...get().progress }; delete progress[key]; pendingRestarts.delete(key);
         set({ progress: persistProgress(progress) });
     },
     clearHistory: providerId => {
-        if (providerId === 'fanjiao') persistFanjiaoOperation(() => clearFanjiaoHistory(get().progress, get().mainOnly));
+        if (providerId === 'fanjiao') persistFanjiaoOperation(() => clearFanjiaoHistory(get().progress));
         const progress = Object.fromEntries(Object.entries(get().progress).filter(([key]) => !key.startsWith(`online:${providerId}:`)));
         for (const key of pendingRestarts) if (key.startsWith(`online:${providerId}:`)) pendingRestarts.delete(key);
         set({ progress: persistProgress(progress) });
     },
     beginSession: key => {
         beginFanjiaoSession(key);
-        return () => set({ progress: persistProgress(endFanjiaoSession(key, get().progress, get().mainOnly)) });
+        return () => set({ progress: persistProgress(endFanjiaoSession(key, get().progress)) });
     },
-    exportSyncData: (history, preference) => exportFanjiaoData(get().progress, get().mainOnly, history, preference),
+    exportSyncData: () => exportFanjiaoData(get().progress),
     mergeSyncData: data => {
-        const next = mergeFanjiaoData(data, get().progress, get().mainOnly);
-        persist(MAIN_ONLY_KEY, String(next.mainOnly));
-        set({ ...next, progress: persistProgress(next.progress) });
+        set({ progress: persistProgress(mergeFanjiaoData(data, get().progress)) });
     },
 }));
 

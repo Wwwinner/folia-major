@@ -11,7 +11,7 @@ import { colorWithAlpha, mixColors } from '../colorMix';
 import { buildMonetGlowShadow, resolveMonetFillWidth, resolveMonetGlow, MONET_SCROLL_SPRING, MONET_SCALE_SPRING } from './monetLyricMotion';
 import MonetSentenceText from './MonetSentenceText';
 import { DialogueMistReveal } from '../dialogue/DialogueMist';
-import { centerDialogueActiveGroup, fitDialogueActiveGroup, positionDialogueMistQueue, retainDialogueActiveEntries } from '../dialogue/dialogueRailEntries';
+import { centerDialogueActiveGroup, fitDialogueActiveGroup, retainDialogueActiveEntries } from '../dialogue/dialogueRailEntries';
 import {
     buildWordColorRangesFromMatchers,
     prepareWordColorMatchers,
@@ -399,8 +399,7 @@ const buildPositionedEntries = (
         current.y = next.y - current.scaledHeight - resolveLineGap(current, next, lyricFontPx);
     }
 
-    return followActiveGroup
-        ? positionDialogueMistQueue(centerDialogueActiveGroup(measuredEntries, railHeight), railHeight) : measuredEntries;
+    return followActiveGroup ? centerDialogueActiveGroup(measuredEntries, railHeight) : measuredEntries;
 };
 
 const getLineMask = (isClipped: boolean, fadePx: number) => (
@@ -688,9 +687,8 @@ const MonetRailLine: React.FC<{
     renderStaticPassed?: boolean;
     wholeLine?: boolean;
     reducedMotion?: boolean;
-    mistEntryY?: number;
     onSentenceMeasure: (key: string, rows: number) => void;
-}> = ({ entry, currentTime, theme, lyricFontPx, glowIntensity, translationFontPx, fontStack, translationFontStack, translationFontWeight, glowBufferPx, vGlowBufferPx, fontsEpoch, wordColorMatchers, showSubtitleTranslation, audioPower, onLineSeek, canSeek = false, disableEntryMotion = false, renderStaticPassed = false, wholeLine = false, reducedMotion = false, mistEntryY, onSentenceMeasure }) => {
+}> = ({ entry, currentTime, theme, lyricFontPx, glowIntensity, translationFontPx, fontStack, translationFontStack, translationFontWeight, glowBufferPx, vGlowBufferPx, fontsEpoch, wordColorMatchers, showSubtitleTranslation, audioPower, onLineSeek, canSeek = false, disableEntryMotion = false, renderStaticPassed = false, wholeLine = false, reducedMotion = false, onSentenceMeasure }) => {
     const initialOffset = entry.offset >= 0 ? 34 : -34;
     const exitOffset = entry.status === 'passed' || entry.offset < 0 ? -38 : 38;
     // The active lyric must never be truncated, so its box is sized by its own wrapped
@@ -742,9 +740,7 @@ const MonetRailLine: React.FC<{
                 }
             } : undefined}
             className={`absolute top-0 min-w-0 will-change-transform ${lineCanSeek ? 'cursor-pointer' : ''}`}
-            initial={disableEntryMotion || reducedMotion ? false : mistEntryY !== undefined ? {
-                opacity: 0, y: mistEntryY, scale: entry.tone.scale, filter: `blur(${entry.tone.blurPx}px)`,
-            } : wholeLine ? false : {
+            initial={wholeLine || disableEntryMotion || reducedMotion ? false : {
                 opacity: 0,
                 y: entry.y + initialOffset,
                 scale: entry.tone.scale * 0.98,
@@ -815,6 +811,7 @@ const MonetRailLine: React.FC<{
             >
                 {wholeLine ? <DialogueMistReveal currentTime={currentTime} start={entry.line.startTime} end={entry.line.endTime}
                     pending={isWaiting} reservedHeight={entry.layout.textContentHeightPx} seed={entry.index}
+                    contentWidth={entry.layout.textContentWidthPx} lineHeight={entry.layout.lineHeightPx}
                     theme={theme} disabled={reducedMotion || disableEntryMotion || entry.status === 'passed'}>
                     {!isWaiting && <MonetSentenceText line={entry.line} currentTime={currentTime} theme={theme} fontPx={lyricFontPx} reducedMotion={reducedMotion}
                     glowIntensity={glowIntensity}
@@ -1171,8 +1168,6 @@ const MonetLyricsRail: React.FC<MonetLyricsRailProps> = ({
                             renderStaticPassed={isManualScrolling && entry.index !== currentLineIndex}
                             wholeLine={Boolean(sentencePlayback)}
                             reducedMotion={reducedMotion}
-                            mistEntryY={sentencePlayback && entry.status === 'waiting' && entry.index === sentencePlayback.startedCount + 1
-                                ? Math.max(entry.y + entry.scaledHeight, railSize.height || MONET_RAIL_HEIGHT_FALLBACK_PX) : undefined}
                             onSentenceMeasure={handleSentenceMeasure}
                         />
                     ))}

@@ -20,13 +20,6 @@ export function retainDialogueActiveEntries(entries: MonetVisibleLineEntry[], li
 
 interface DialogueLayoutEntry { status: string; y: number; scaledHeight: number; }
 
-/** 第二团雾停在下沿的渐隐区域，接棒时沿原轨道上移，不在第一团的位置补建。 */
-export function positionDialogueMistQueue<T extends DialogueLayoutEntry>(entries: T[], railHeight: number): T[] {
-    const tail = entries.filter(entry => entry.status === 'waiting')[1];
-    return entries.map(entry => entry === tail
-        ? { ...entry, y: Math.max(entry.y, railHeight * 0.86 - entry.scaledHeight * 0.3) } : entry);
-}
-
 /** 保留活动组的可读区域；只在空间不足时收起组内历史，不删活动句或改变时间顺序。 */
 export function fitDialogueActiveGroup<T extends DialogueLayoutEntry>(entries: T[], railHeight: number, gap: (a: T, b: T) => number): T[] {
     const first = entries.findIndex(entry => entry.status === 'active');

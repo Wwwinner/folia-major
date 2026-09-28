@@ -14,8 +14,6 @@ const DEFAULT_CONFIG: SyncProviderConfig = {
     enabled: false,
     workerBaseUrl: '',
     authToken: '',
-    fanjiaoHistory: false,
-    fanjiaoPreference: false,
     fanjiaoScope: '',
 };
 
@@ -56,13 +54,10 @@ export const getSyncConfig = (): SyncProviderConfig => {
     const stored = readJson<Partial<SyncProviderConfig>>(SYNC_CONFIG_STORAGE_KEY, {});
     return {
         ...DEFAULT_CONFIG,
-        ...stored,
         provider: SYNC_PROVIDER,
         workerBaseUrl: typeof stored.workerBaseUrl === 'string' ? stored.workerBaseUrl.trim() : '',
         authToken: typeof stored.authToken === 'string' ? stored.authToken.trim() : '',
         enabled: Boolean(stored.enabled),
-        fanjiaoHistory: stored.fanjiaoHistory === true,
-        fanjiaoPreference: stored.fanjiaoPreference === true,
         fanjiaoScope: typeof stored.fanjiaoScope === 'string' ? stored.fanjiaoScope : '',
     };
 };
@@ -81,8 +76,6 @@ export const saveSyncConfig = (config: SyncProviderConfig) => {
         enabled: config.enabled,
         workerBaseUrl,
         authToken,
-        fanjiaoHistory: config.fanjiaoHistory === true,
-        fanjiaoPreference: config.fanjiaoPreference === true,
         fanjiaoScope: identityChanged ? createSyncIdentity() : previous.fanjiaoScope || 'local',
     }));
     if (identityChanged) setFanjiaoSyncStatus(DEFAULT_STATUS);

@@ -5,7 +5,7 @@ import type { SyncProviderConfig } from './syncTypes';
 
 // Manual only: startup theme sync and the five-second recorder do not call this coordinator.
 let running = false;
-export const canSyncFanjiao = (config = getSyncConfig()) => isSyncConfigured(config) && Boolean(config.fanjiaoHistory || config.fanjiaoPreference);
+export const canSyncFanjiao = (config = getSyncConfig()) => isSyncConfigured(config);
 const identity = (config: SyncProviderConfig) => JSON.stringify([config.workerBaseUrl, config.authToken, config.fanjiaoScope]);
 
 export async function syncFanjiaoNow() {
@@ -15,13 +15,12 @@ export async function syncFanjiaoNow() {
     const sameIdentity = () => originalIdentity === identity(getSyncConfig());
     const ensureCurrent = () => {
         const current = getSyncConfig();
-        if (!sameIdentity() || !current.enabled || current.fanjiaoHistory !== config.fanjiaoHistory
-            || current.fanjiaoPreference !== config.fanjiaoPreference) throw new Error('fanjiaoSyncChanged');
+        if (!sameIdentity() || !current.enabled) throw new Error('fanjiaoSyncChanged');
     };
     running = true;
     try {
         setFanjiaoSyncStatus({ state: 'syncing', lastError: null });
-        const local = useEpisodePlaybackStore.getState().exportSyncData(Boolean(config.fanjiaoHistory), Boolean(config.fanjiaoPreference));
+        const local = useEpisodePlaybackStore.getState().exportSyncData();
         const remote = await exchangeFanjiaoData(config, local, ensureCurrent);
         ensureCurrent();
         useEpisodePlaybackStore.getState().mergeSyncData(remote);

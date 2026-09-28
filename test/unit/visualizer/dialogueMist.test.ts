@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { dialogueMistDissolveProgress, dialogueMistProgress } from '../../../src/components/visualizer/dialogue/dialogueMistMotion';
+import { dialogueMistAnticipation, dialogueMistDissolveProgress, dialogueMistProgress } from '../../../src/components/visualizer/dialogue/dialogueMistMotion';
 
 // 散雾跟随播放时钟，不能延后短句的可读时间。
 describe('dialogue mist timing and placement', () => {
+    it('shows mist only in the second before a cue and restores that visibility on rewind', () => {
+        expect(dialogueMistAnticipation(5, 7)).toBe(0);
+        expect(dialogueMistAnticipation(6, 7)).toBe(0);
+        expect(dialogueMistAnticipation(6.01, 7)).toBeGreaterThan(0);
+        expect(dialogueMistAnticipation(6.5, 7)).toBe(0.5);
+        expect(dialogueMistAnticipation(6.99, 7)).toBeLessThan(1);
+        expect(dialogueMistAnticipation(7, 7)).toBe(1);
+        expect(dialogueMistAnticipation(8, 7)).toBe(1);
+        expect(dialogueMistAnticipation(5, 7)).toBe(0);
+    });
     it('reveals the whole sentence together after its start', () => {
         expect(dialogueMistProgress(1.9, 2, 6)).toBe(0);
         expect(dialogueMistProgress(2, 2, 6)).toBe(0);

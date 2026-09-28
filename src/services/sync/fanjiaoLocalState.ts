@@ -1,6 +1,6 @@
-import { isFanjiaoKey, mergeFanjiaoHistory, mergeFanjiaoPreference, parseEpisodeValue,
+import { isFanjiaoKey, mergeFanjiaoHistory, parseEpisodeValue,
     parseFanjiaoSyncData, MAX_FANJIAO_RECORDS, ZERO_VERSION } from '../../../shared/fanjiaoSync.mjs';
-import type { EpisodeMetadata, EpisodeValue, FanjiaoHistory, FanjiaoPreference, FanjiaoSyncData, SyncVersion } from '../../../shared/fanjiaoSync.mjs';
+import type { EpisodeMetadata, EpisodeValue, FanjiaoHistory, FanjiaoSyncData, SyncVersion } from '../../../shared/fanjiaoSync.mjs';
 import { createSyncIdentity } from './syncConfig';
 
 // Durable operation journal. Cache eviction never deletes sync records; clear is the only tombstone compaction.
@@ -9,12 +9,11 @@ type Persistence = Pick<Storage, 'getItem' | 'setItem'>;
 type Legacy = Record<string, EpisodeValue>;
 export class FanjiaoLocalState {
     history: FanjiaoHistory = { epoch: ZERO_VERSION, records: [] };
-    preference: FanjiaoPreference | null = null;
     private device = createSyncIdentity();
     private clock = 0;
     private scope: string;
 
-    constructor(private storage: Persistence | null, scope: string, legacy: Legacy, mainOnly: boolean, private now = Date.now) {
+    constructor(private storage: Persistence | null, scope: string, legacy: Legacy, private now = Date.now) {
         this.scope = scope;
         const raw = storage?.getItem(FANJIAO_LOCAL_KEY);
         if (raw) {
@@ -24,17 +23,16 @@ export class FanjiaoLocalState {
                 if (saved.schema === 1 && data?.history && typeof saved.scope === 'string'
                     && typeof saved.device === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(saved.device)) {
                     this.scope = saved.scope; this.device = saved.device; this.history = data.history;
-                    this.preference = data.preference ?? null;
                     this.observe();
-                    this.ensureScope(scope, legacy, mainOnly);
+                    this.ensureScope(scope, legacy);
                     return;
                 }
             } catch { /* Keep the v1 playback records as migration fallback. */ }
         }
-        this.seed(legacy, mainOnly);
+        this.seed(legacy);
     }
 
-    private seed(legacy: Legacy, mainOnly: boolean) {
+    private seed(legacy: Legacy) {
         this.history = { epoch: ZERO_VERSION, records: [] };
         for (const [key, value] of Object.entries(legacy)) {
             const parsed = isFanjiaoKey(key) && parseEpisodeValue(value);
@@ -43,21 +41,20 @@ export class FanjiaoLocalState {
             const version = { counter: Math.max(1, Math.trunc(value.updatedAt)), device: this.device };
             this.history.records.push({ key, epoch: ZERO_VERSION, generation: ZERO_VERSION, version, deleted: false, value: parsed });
         }
-        this.preference = { version: { counter: 1, device: this.device }, mainOnly };
         if (this.history.records.length > MAX_FANJIAO_RECORDS) throw new Error('fanjiaoSyncCapacity');
         this.observe();
     }
 
-    ensureScope(scope: string, legacy: Legacy, mainOnly: boolean) {
+    ensureScope(scope: string, legacy: Legacy) {
         if (scope === this.scope) return;
         this.scope = scope;
         // A different server/identity starts from live local values, never old cursors or deletion operations.
-        this.seed(legacy, mainOnly);
+        this.seed(legacy);
         this.flush();
     }
 
     private observe() {
-        this.clock = Math.max(this.clock, this.history.epoch.counter, this.preference?.version.counter ?? 0,
+        this.clock = Math.max(this.clock, this.history.epoch.counter,
             ...this.history.records.map(row => Math.max(row.version.counter, row.generation.counter)));
     }
 
@@ -69,7 +66,7 @@ export class FanjiaoLocalState {
     flush() {
         if (!this.storage) throw new Error('fanjiaoSyncStorageUnavailable');
         this.storage.setItem(FANJIAO_LOCAL_KEY, JSON.stringify({ schema: 1, scope: this.scope, device: this.device,
-            data: { protocol: 1, history: this.history, preference: this.preference } }));
+            data: { protocol: 1, history: this.history } }));
     }
 
     save(key: string, value: EpisodeValue, revive = false) {
@@ -110,11 +107,6 @@ export class FanjiaoLocalState {
         this.flush();
     }
 
-    setPreference(mainOnly: boolean) {
-        this.preference = { version: this.next(), mainOnly };
-        this.flush();
-    }
-
     hydrate(key: string, metadata: EpisodeMetadata) {
         const record = this.history.records.find(row => row.key === key);
         if (!record?.value || record.value.metadata) return;
@@ -126,14 +118,12 @@ export class FanjiaoLocalState {
         const history = data.history ? mergeFanjiaoHistory(this.history, data.history) : this.history;
         if (history.records.length > MAX_FANJIAO_RECORDS) throw new Error('fanjiaoSyncCapacity');
         this.history = history;
-        if (data.preference !== undefined) this.preference = mergeFanjiaoPreference(this.preference, data.preference);
         this.observe();
         this.flush();
     }
 
-    export(history: boolean, preference: boolean): FanjiaoSyncData {
+    export(): FanjiaoSyncData {
         this.flush();
-        return { protocol: 1, ...(history ? { history: structuredClone(this.history) } : {}),
-            ...(preference ? { preference: this.preference && { ...this.preference, version: { ...this.preference.version } } } : {}) };
+        return { protocol: 1, history: structuredClone(this.history) };
     }
 }

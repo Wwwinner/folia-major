@@ -11,7 +11,7 @@ import {
 } from '@/components/visualizer/backgrounds/latent/LatentBackground';
 import { resolveMonetWordColor } from '@/components/visualizer/monet/MonetLyricsRail';
 import { buildMonetDisplayTokens, resolveMonetLyricContext } from '@/components/visualizer/monet/VisualizerMonet';
-import { buildMonetVisibleLineEntries, measureMonetLineLayout, resolveMonetSweepEdgeSoftness, resolveMonetSweepEnd } from '@/components/visualizer/monet/monetLyricsModel';
+import { applyMonetSentenceRows, buildMonetVisibleLineEntries, measureMonetLineLayout, resolveMonetSweepEdgeSoftness, resolveMonetSweepEnd } from '@/components/visualizer/monet/monetLyricsModel';
 import { colorWithAlpha, mixColors, parseColorChannels } from '@/components/visualizer/colorMix';
 import { buildWordColorRanges, prepareWordColorMatchers, resolveTokenColorMap } from '@/components/visualizer/wordColoring';
 import { resolveStoredLatentBackgroundTuning, resolveStoredMonetBackgroundTuning, resolveStoredMonetTuning, resolveStoredNomandBackgroundTuning, resolveVisualizerBackgroundMode } from '@/stores/visualizerSettingsPersistence';
@@ -465,6 +465,19 @@ describe('Monet tuning and lyric helpers', () => {
         expect(hiddenLayout.translationLineCount).toBe(0);
         expect(hiddenLayout.translationHeightPx).toBe(0);
         expect(hiddenLayout.visualHeightPx).toBe(hiddenLayout.textHeightPx);
+    });
+
+    it('retains measured sentence width instead of expanding short text to the available column', () => {
+        const measure = (fullText: string, maxWidthPx: number) => measureMonetLineLayout({
+            line: { startTime: 0, endTime: 3, fullText, words: [] }, status: 'active',
+            fontPx: 32, translationFontPx: 18, fontStack: 'Arial, sans-serif', maxWidthPx, wholeLine: true,
+        });
+        const short = measure('夏可：走吧。', 700);
+        expect(short.textContentWidthPx).toBeGreaterThan(0);
+        expect(short.textContentWidthPx).toBeLessThan(200);
+        expect(measure('夏可：走吧。', 350).textContentWidthPx).toBe(short.textContentWidthPx);
+        expect(applyMonetSentenceRows(short, 2, 'active').textContentWidthPx).toBe(short.textContentWidthPx);
+        expect(measure('长句需要换行。'.repeat(20), 180).textContentWidthPx).toBeLessThanOrEqual(180);
     });
 
     it('clears the full Monet mask softness before a word becomes passed', () => {

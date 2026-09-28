@@ -16,8 +16,6 @@ export type SyncProviderConfig = {
     enabled: boolean;
     workerBaseUrl: string;
     authToken: string;
-    fanjiaoHistory?: boolean;
-    fanjiaoPreference?: boolean;
     fanjiaoScope?: string;
 };
 

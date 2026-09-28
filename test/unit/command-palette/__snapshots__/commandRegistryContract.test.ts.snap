@@ -89,8 +89,6 @@ exports[`command palette registry contract > keeps the registered command order 
   "settings-r2-sync",
   "sync-now",
   "sync-fanjiao-now",
-  "sync-fanjiao-history-toggle",
-  "sync-fanjiao-preference-toggle",
   "settings-local-library-watch",
   "local-library-auto-scan-toggle",
   "settings-desktop",

@@ -2,7 +2,7 @@ import React from 'react';
 import { AudioWaveform, Check, Cloud, Command, Database, Disc3, Download, FolderOpen, HardDrive, Layers, Loader2, Pencil, PlayCircle, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Theme } from '../../../types';
-import { getSyncConfig, getSyncStatus, saveSyncConfig, setSyncStatus, subscribeSyncConfig, subscribeSyncStatus, setFanjiaoSyncStatus } from '../../../services/sync/syncConfig';
+import { getSyncConfig, getSyncStatus, saveSyncConfig, setSyncStatus, subscribeSyncConfig, subscribeSyncStatus, getFanjiaoSyncStatus, setFanjiaoSyncStatus } from '../../../services/sync/syncConfig';
 import { exportSyncLibraryBundle, importSyncLibraryBundle, isSyncLibraryExportBundle, syncNow, testSyncProviderConnection } from '../../../services/sync/syncCoordinator';
 import { createSyncLibraryZipBlob, readSyncLibraryZipFile } from '../../../services/sync/syncArchive';
 import { SYNC_PROVIDER, type SyncProviderConfig, type SyncRuntimeStatus } from '../../../services/sync/syncTypes';
@@ -12,7 +12,7 @@ import { CustomSelect } from '../../shared/CustomSelect';
 import LocalLibraryWatchSection from './LocalLibraryWatchSection';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
 import SettingsSectionHeading from './navigation/SettingsSectionHeading';
-import FanjiaoSyncSettings from './FanjiaoSyncSettings';
+import { canSyncFanjiao, syncFanjiaoNow } from '../../../services/sync/fanjiaoSyncCoordinator';
 
 // src/components/modal/settings/StorageSettingsSection.tsx
 // Shared storage and media cache settings used by the main options page and storage subview.
@@ -72,7 +72,8 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
     const [syncConfig, setSyncConfig] = React.useState<SyncProviderConfig>(() => getSyncConfig());
     const [draftSyncConfig, setDraftSyncConfig] = React.useState<SyncProviderConfig>(() => getSyncConfig());
     const [syncStatus, setSyncStatusState] = React.useState<SyncRuntimeStatus>(() => getSyncStatus());
-    const [syncAction, setSyncAction] = React.useState<'idle' | 'testing' | 'syncing' | 'syncingSettings' | 'exporting' | 'importing'>('idle');
+    const [syncAction, setSyncAction] = React.useState<'idle' | 'testing' | 'syncing' | 'syncingSettings' | 'syncingFanjiao' | 'exporting' | 'importing'>('idle');
+    const fanjiaoStatus = React.useSyncExternalStore(subscribeSyncStatus, getFanjiaoSyncStatus, getFanjiaoSyncStatus);
     const [testResult, setTestResult] = React.useState<'idle' | 'success' | 'error'>('idle');
     const [syncSummaryMsg, setSyncSummaryMsg] = React.useState<string | null>(null);
     const syncImportInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -97,7 +98,13 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
     ];
     const syncConfigDirty = JSON.stringify(syncConfig) !== JSON.stringify(draftSyncConfig);
     const syncConfigured = Boolean(draftSyncConfig.workerBaseUrl.trim() && draftSyncConfig.authToken.trim());
-    const syncStatusLabel = syncStatus.state === 'error'
+    const showFanjiaoStatus = fanjiaoStatus.state === 'syncing'
+        || (fanjiaoStatus.lastSyncAt ?? '') > (syncStatus.lastSyncAt ?? '');
+    const syncStatusLabel = showFanjiaoStatus
+        ? fanjiaoStatus.state === 'syncing' ? t('ui.storage.fanjiaoSyncWorking')
+            : fanjiaoStatus.state === 'error' ? t(`ui.storage.${fanjiaoStatus.lastError || 'fanjiaoSyncNetwork'}`)
+                : t('ui.storage.fanjiaoSyncSuccess', { time: new Date(fanjiaoStatus.lastSyncAt!).toLocaleString() })
+        : syncStatus.state === 'error'
         ? (syncStatus.lastError || t('options.r2SyncStatusError') || 'Sync failed')
         : syncStatus.lastSyncAt
             ? `${t('options.r2SyncLastSync') || 'Last sync'}: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`
@@ -196,6 +203,19 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
         } finally {
             setSyncAction('idle');
         }
+    };
+
+    const handleSyncFanjiao = async () => {
+        if (syncConfigDirty && !handleSaveSyncConfig()) return;
+        setSyncAction('syncingFanjiao');
+        setSyncSummaryMsg(null);
+        try {
+            await syncFanjiaoNow();
+            const status = getFanjiaoSyncStatus();
+            setSyncSummaryMsg(status.state === 'success'
+                ? t('ui.storage.fanjiaoSyncSuccess', { time: new Date(status.lastSyncAt!).toLocaleString() })
+                : t(`ui.storage.${status.lastError || 'fanjiaoSyncNetwork'}`));
+        } finally { setSyncAction('idle'); }
     };
 
     const handleExportSyncLibrary = async () => {
@@ -397,7 +417,7 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
                         </div>
 
                         {/* 核心同步功能 */}
-                        <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-white/5">
+                        <div data-testid="sync-actions" className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-white/5">
                             <button
                                 type="button"
                                 onClick={() => void handleSyncNow()}
@@ -416,10 +436,16 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
                                 {syncAction === 'syncingSettings' ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
                                 {t('options.syncVisualSettings')}
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => void handleSyncFanjiao()}
+                                disabled={!canSyncFanjiao(draftSyncConfig) || syncAction !== 'idle' || fanjiaoStatus.state === 'syncing'}
+                                className="flex-1 px-3 py-2.5 bg-purple-400/12 hover:bg-purple-400/20 rounded-lg text-xs font-medium transition-colors flex justify-center items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed text-purple-300"
+                            >
+                                {fanjiaoStatus.state === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                {t('ui.storage.fanjiaoSyncNow')}
+                            </button>
                         </div>
-
-                        <FanjiaoSyncSettings config={draftSyncConfig} busy={syncAction !== 'idle'}
-                            onChange={updateDraftSyncConfig} onSave={handleSaveSyncConfig} />
 
                         <input
                             ref={syncImportInputRef}
@@ -430,7 +456,7 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
                         />
                     </div>
 
-                    <div className={`rounded-lg border px-3 py-2 text-xs ${(syncStatus.state === 'error' || testResult === 'error') && !syncSummaryMsg ? errorTextColor : testResult === 'success' ? 'text-green-500 border-green-500/20 bg-green-500/5' : ''}`} style={{ color: testResult === 'success' || testResult === 'error' ? undefined : 'var(--text-secondary)' }}>
+                    <div role="status" className={`rounded-lg border px-3 py-2 text-xs ${(syncStatus.state === 'error' || testResult === 'error') && !syncSummaryMsg ? errorTextColor : testResult === 'success' ? 'text-green-500 border-green-500/20 bg-green-500/5' : ''}`} style={{ color: testResult === 'success' || testResult === 'error' ? undefined : 'var(--text-secondary)' }}>
                         {syncSummaryMsg || syncStatusLabel}
                     </div>
                 </div>

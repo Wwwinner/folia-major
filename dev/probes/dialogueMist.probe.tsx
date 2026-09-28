@@ -41,14 +41,14 @@ function DialogueMistProbe() {
         <div className="fixed inset-x-0 top-0 z-50 flex flex-wrap items-center gap-x-4 gap-y-2 bg-[#172127]/95 px-4 py-3 text-sm">
             <strong>雾中对白 · 无音频演示</strong>
             <button onClick={() => { currentTime.set(0); setPlaying(true); }}>从头播放</button>
-            <button onClick={() => { currentTime.set(5); setPlaying(true); }}>看雾队列</button>
+            <button onClick={() => { currentTime.set(5); setPlaying(true); }}>看随句起雾</button>
             <button onClick={() => setReference(value => !value)}>{reference ? '切回对白' : '莫奈对照'}</button>
             <button onClick={() => { currentTime.set(6.7); setPlaying(true); }}>播放下一句</button>
             <button onClick={() => setPlaying(value => !value)}>{playing ? '暂停' : '继续'}</button>
             <input ref={rangeRef} aria-label="演示时间" type="range" min={0} max={22} step={0.01} defaultValue={1.6}
                 className="w-36 accent-[#d4c5af]" onChange={event => seek(Number(event.target.value))} />
             <output ref={clockRef} className="font-mono text-xs">1.60 秒</output>
-            {[['雾气占位', 1.6], ['散雾中', 2.1], ['散开后', 3], ['下一句前', 6.7], ['重叠对白', 9.1], ['短句', 13.6]].map(([label, time]) =>
+            {[['雾气占位', 1.6], ['散雾中', 2.2], ['散开后', 3], ['提前两秒', 5], ['起雾中', 6.1], ['下一句前', 6.7], ['重叠对白', 9.1], ['短句前', 13.3], ['短句', 13.6]].map(([label, time]) =>
                 <button key={label} onClick={() => seek(Number(time))}>{label}</button>)}
         </div>
         <VisualizerRenderer mode={reference ? 'monet' : 'dialogue'} currentTime={currentTime} currentLineIndex={startedCount - 1} lines={lines}
@@ -58,4 +58,4 @@ function DialogueMistProbe() {
             songTitle="雾散之后" songArtist="对白入场预览" onLyricLineSeek={seek} />
     </div>;
 }
-export default { id: 'dialogueMist', title: '雾中对白', description: '两团纯雾连续接棒、莫奈行过渡与音频时钟驱动的散雾。', Component: DialogueMistProbe } satisfies ProbeDefinition;
+export default { id: 'dialogueMist', title: '雾中对白', description: '字幕自然位置提前一秒起雾，跟随莫奈行过渡并散开。', Component: DialogueMistProbe } satisfies ProbeDefinition;

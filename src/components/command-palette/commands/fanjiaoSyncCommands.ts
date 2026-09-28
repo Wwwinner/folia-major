@@ -1,10 +1,10 @@
 import { canSyncFanjiao, syncFanjiaoNow } from '../../../services/sync/fanjiaoSyncCoordinator';
-import { getFanjiaoSyncStatus, getSyncConfig, saveSyncConfig, setFanjiaoSyncStatus } from '../../../services/sync/syncConfig';
+import { getFanjiaoSyncStatus } from '../../../services/sync/syncConfig';
 import { defineCommand } from '../commandFactories';
 
-// Functional opt-ins have direct commands and share the settings UI's availability guard.
+// The manual history sync command shares the settings button's availability guard.
 export const fanjiaoSyncCommands = [
-    defineCommand({ id: 'sync-fanjiao-now', group: 'settings', title: 'Sync Fanjiao data', description: 'Manually sync selected Fanjiao data',
+    defineCommand({ id: 'sync-fanjiao-now', group: 'settings', title: 'Sync Fanjiao data', description: 'Sync Fanjiao listening history and resume positions',
         keywords: ['fanjiao sync', '同步饭角数据', 'fjtb'], isAvailable: () => canSyncFanjiao() && getFanjiaoSyncStatus().state !== 'syncing',
         execute: async (_input, context) => {
             if (!canSyncFanjiao()) return false;
@@ -15,20 +15,4 @@ export const fanjiaoSyncCommands = [
                 : context.shared.t(`ui.storage.${status.lastError || 'fanjiaoSyncNetwork'}`) });
             return true;
         } }),
-    ...(['fanjiaoHistory', 'fanjiaoPreference'] as const).map((category, index) => defineCommand({
-        id: index === 0 ? 'sync-fanjiao-history-toggle' : 'sync-fanjiao-preference-toggle', group: 'settings',
-        title: index === 0 ? 'Toggle Fanjiao history sync' : 'Toggle Fanjiao preference sync',
-        description: 'Choose data to sync on this device', keywords: ['fanjiao sync options', index === 0 ? '饭角收听记录同步' : '饭角播放偏好同步', 'fjtb'],
-        execute: (_input, context) => {
-            const config = getSyncConfig();
-            try {
-                saveSyncConfig({ ...config, [category]: !config[category] });
-                context.shared.setStatusMsg({ type: 'info', text: context.shared.t('ui.storage.fanjiaoSyncChoiceSaved') });
-            } catch {
-                setFanjiaoSyncStatus({ state: 'error', lastError: 'fanjiaoSyncStorageUnavailable' });
-                context.shared.setStatusMsg({ type: 'error', text: context.shared.t('ui.storage.fanjiaoSyncStorageUnavailable') });
-            }
-            return true;
-        },
-    })),
 ];

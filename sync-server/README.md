@@ -308,7 +308,7 @@ http://127.0.0.1:13000
 | `POST` | `/themes/bucket` | 按 bucket 拉取主题，用于增量同步 |
 | `POST` | `/themes/list` | 分页读取完整主题库，用于导出 |
 | `GET` / `POST` | `/fanjiao/history` | 分页读取／原子合并饭角逐集记录、重听及删除／清空版本 |
-| `GET` / `PUT` | `/fanjiao/preference` | 读取／合并正片连续播放偏好 |
+| `GET` / `PUT` | `/fanjiao/preference` | 仅兼容旧客户端；当前客户端不再同步播放偏好 |
 
 客户端是本地优先的：AI 主题和主题同步 registry 保存在本机 IndexedDB，启动时会自动做主题同步；视觉设置的拉取/推送、完整 sync library 的 zip 导入导出由存储设置页面或命令面板触发。主题 registry 从旧 localStorage 迁移到 IndexedDB 时会执行一次性兼容迁移。
 
@@ -324,7 +324,7 @@ http://127.0.0.1:13000
 
 当前协议约束：schema version 为 `1`，主题 manifest 固定为 `256` 个 bucket；主题批量写入上限为 `500`，bucket 请求最多 `32` 个，完整主题 list 最多 `1000` 条。修改这些限制或路由时必须同步客户端 `src/services/sync/*` 和本 README。
 
-饭角同步使用独立 protocol 1 与独立数据表；`/health` 的 `capabilities.fanjiaoSync: 1` 表示支持。两个类别默认关闭且只手动同步，每批／页 100 条、请求体最多 1 MiB、历史最多 10000 条（含永久保留到清空的删除标记）。升级服务端后首次请求自动创建新表，保留主题／外观旧接口。部署 Node、Docker 或 Workers 时均需更新服务端代码；完整冲突、容量、迁移、测试和旧版本升级说明见 [饭角同步协议](../docs/fanjiao-sync-protocol.md)。
+饭角同步使用独立 protocol 1 与独立数据表；`/health` 的 `capabilities.fanjiaoSync: 1` 表示支持。客户端通过「同步饭角数据」按钮手动同步收听记录与续播，不再提供类别开关或播放偏好同步。每批／页 100 条、请求体最多 1 MiB、历史最多 10000 条（含永久保留到清空的删除标记）。升级服务端后首次请求自动创建新表，保留主题／外观旧接口。部署 Node、Docker 或 Workers 时均需更新服务端代码；完整冲突、容量、迁移、测试和旧版本升级说明见 [饭角同步协议](../docs/fanjiao-sync-protocol.md)。
 
 ---
 
