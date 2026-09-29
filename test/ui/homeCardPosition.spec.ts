@@ -17,6 +17,20 @@ const bootHome = async (page: Page) => {
             getSettings: async () => ({}),
             getCacheDirectory: async () => ({ path: '', isDefault: true }),
         });
+        // Service workers are blocked here, so the local-cover worker would never become ready and
+        // bootstrap would sit out its full 10s readiness timeout before mounting. Under a parallel
+        // run that pushed the first frame past the 15s expect. Failing registration takes the app's
+        // own "worker unavailable" path immediately. Other registrations (the PWA worker) keep the
+        // native call: they do not gate mounting, and rejecting them only adds unhandled rejections.
+        const register = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+        Object.defineProperty(navigator.serviceWorker, 'register', {
+            configurable: true,
+            value: (scriptURL: string | URL, options?: RegistrationOptions) => (
+                String(scriptURL).includes('folia-cover-sw')
+                    ? Promise.reject(new Error('Service workers are blocked in this spec.'))
+                    : register(scriptURL, options)
+            ),
+        });
     });
     await mockNeteaseApi(page, 'logged-in');
     await page.route('**/__mock_netease__/user/cloud?*', route => route.fulfill({ json: { count: 0, songs: [] } }));
@@ -36,7 +50,10 @@ const expectCenteredCard = async (page: Page, index: number, name: string) => {
     await expect(focusedTitle(page)).toHaveText(name);
     // Checking the label alone would miss a restored index with the scroll position still at zero.
     await expect.poll(() => page.locator(`[data-grid3d-index="${index}"]`).evaluate(node => {
-        const slider = node.closest('[data-grid3d-slider]')!;
+        // Right after a reorder the card can be outside the slider for a frame. Report "not
+        // centered yet" so the poll retries instead of throwing on the missing slider.
+        const slider = node.closest('[data-grid3d-slider]');
+        if (!slider) return Number.POSITIVE_INFINITY;
         const card = node.getBoundingClientRect();
         const viewport = slider.getBoundingClientRect();
         return Math.abs(card.x + card.width / 2 - viewport.x - viewport.width / 2);

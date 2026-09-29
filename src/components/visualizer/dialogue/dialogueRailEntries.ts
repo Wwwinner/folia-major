@@ -23,7 +23,8 @@ interface DialogueLayoutEntry { status: string; y: number; scaledHeight: number;
 /** 保留活动组的可读区域；只在空间不足时收起组内历史，不删活动句或改变时间顺序。 */
 export function fitDialogueActiveGroup<T extends DialogueLayoutEntry>(entries: T[], railHeight: number, gap: (a: T, b: T) => number): T[] {
     const first = entries.findIndex(entry => entry.status === 'active');
-    const last = entries.findLastIndex(entry => entry.status === 'active');
+    let last = entries.length - 1;
+    while (last >= 0 && entries[last].status !== 'active') last--;
     if (first < 0 || last === first) return entries;
     const group = entries.slice(first, last + 1);
     const height = () => group.reduce((total, entry, index) => total + entry.scaledHeight
@@ -39,7 +40,9 @@ export function fitDialogueActiveGroup<T extends DialogueLayoutEntry>(entries: T
 /** 以整个活动组为焦点，避免最新一句居中时把较早的重叠句推到上沿之外。 */
 export function centerDialogueActiveGroup<T extends DialogueLayoutEntry>(entries: T[], railHeight: number): T[] {
     const first = entries.find(entry => entry.status === 'active');
-    const last = entries.findLast(entry => entry.status === 'active');
+    let lastIndex = entries.length - 1;
+    while (lastIndex >= 0 && entries[lastIndex].status !== 'active') lastIndex--;
+    const last = entries[lastIndex];
     if (!first || !last) return entries;
     const center = (first.y + last.y + last.scaledHeight) / 2;
     const shift = railHeight * 0.46 - center;

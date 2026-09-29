@@ -28,6 +28,7 @@ import OnlineProviderConnectPanel from './app/home/OnlineProviderConnectPanel';
 import OnlineProviderLoginModal from './app/home/OnlineProviderLoginModal';
 import OnlineDiscoveryHome from './app/home/OnlineDiscoveryHome';
 import EpisodeHistoryPage from './app/home/EpisodeHistoryPage';
+import { buildQrLoginDiagnosticsProps } from './app/home/buildQrLoginDiagnosticsProps';
 import { resolveOnlineProviderAccountView } from './app/home/onlineProviderAccountView';
 import type { MediaId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
 import qqIcon from '../assets/providers/qq.svg';
@@ -303,6 +304,8 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         qrCodeImg,
         qrState,
         qrStatusText,
+        failure: qrLoginFailure,
+        buildDiagnosticReport: buildQrDiagnosticReport,
         start: startQrLogin,
         stop: stopQrLogin,
     } = useOnlineProviderQrLogin({
@@ -310,11 +313,17 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         t,
         onConfirmed: async (confirmedProviderId) => {
             setShowLoginModal(false);
-            if (onlineProviderPlatform) {
-                await onlineProviderPlatform.completeLogin(confirmedProviderId);
-            } else {
+            if (!onlineProviderPlatform) {
                 onRefreshUser();
+                return true;
             }
+            const outcome = await onlineProviderPlatform.completeLogin(confirmedProviderId);
+            // 扫码确认了却没拿到登录态：把弹窗重新打开，让用户看到失败和诊断入口，而不是静默停在未登录。
+            if (outcome === 'refresh-failed') {
+                setShowLoginModal(true);
+                return false;
+            }
+            return true;
         },
     });
 
@@ -666,7 +675,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     };
 
     return (
-        <div ref={gridRootRef} className={`relative w-full h-full flex flex-col font-sans overflow-hidden ${mainBg} pointer-events-auto backdrop-blur-sm ${bottomPadding}`}>
+        <div
+            ref={gridRootRef}
+            data-ponder-page-scope="grid-page"
+            className={`relative w-full h-full flex flex-col font-sans overflow-hidden ${mainBg} pointer-events-auto backdrop-blur-sm ${bottomPadding}`}
+        >
 
             {/* Main Header Container (Fades out when sliding/interacting) */}
             <div className="transition-opacity duration-300 ease-in-out z-20 opacity-100 select-none">
@@ -1012,6 +1025,14 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                 restarting: neteaseApiRestarting,
                                 onRestart: () => void handleRestartNeteaseApi(),
                             }
+                            : undefined}
+                        diagnostics={qrLoginFailure
+                            ? buildQrLoginDiagnosticsProps({
+                                t,
+                                providerId: loginProviderId,
+                                failure: qrLoginFailure,
+                                buildReport: buildQrDiagnosticReport,
+                            })
                             : undefined}
                         // 刷新时保留已选的登录方式，否则用户会被踢回步骤一。
                         onRetry={() => void startQrLogin(loginProviderId, selectedLoginMethodId ?? undefined)}

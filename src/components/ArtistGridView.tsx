@@ -37,6 +37,7 @@ import { useFoliaHexViewport } from './folia-grid/useFoliaHexViewport';
 import { CollectionListItem, SidePanelList } from './shared/SidePanelList';
 import { GridListSearchButton } from './shared/GridListSearchButton';
 import { useGridCommandFilter } from '../hooks/useGridCommandFilter';
+import { hasBlockingWindow } from '../utils/keyboardTargets';
 import { closeCommandFilter, openCommandFilter } from '../stores/useAppViewStore';
 import { appendUniqueByKey, deriveProgressiveLoadingState } from './folia-grid/progressiveGrid';
 import { useProgressiveItemEntrance } from './folia-grid/useProgressiveItemEntrance';
@@ -604,7 +605,8 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                 (target instanceof HTMLElement && target.isContentEditable)
             ) return;
 
-            if (event.key !== 'Escape') return;
+            // Same as GridView: a window above owns Escape, and auto-repeat must not leave the grid.
+            if (event.key !== 'Escape' || event.repeat || hasBlockingWindow()) return;
 
             event.preventDefault();
             // A filter still applied is the first thing Escape undoes, as it always was.
@@ -1346,6 +1348,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
     return (
         <motion.div
             ref={rootRef}
+            data-ponder-page-scope="grid-view-page"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

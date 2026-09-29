@@ -13,6 +13,9 @@ import LocalLibraryWatchSection from './LocalLibraryWatchSection';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
 import SettingsSectionHeading from './navigation/SettingsSectionHeading';
 import { canSyncFanjiao, syncFanjiaoNow } from '../../../services/sync/fanjiaoSyncCoordinator';
+import { openCommandPaletteCommand } from '../../../stores/useAppViewStore';
+import { closeSettings } from '../../../stores/useSettingsModalStore';
+import { LYRIC_EXPORT_COMMAND_ID } from '../../command-palette/commands/lyricExportCommands';
 
 // src/components/modal/settings/StorageSettingsSection.tsx
 // Shared storage and media cache settings used by the main options page and storage subview.
@@ -292,14 +295,31 @@ const StorageSettingsSection: React.FC<StorageSettingsSectionProps> = ({
                                     <div className="text-xs opacity-50" style={{ color: 'var(--text-secondary)' }}>{item.size}</div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => onClear(item.id)}
-                                disabled={isCleaning === item.id}
-                                className={`p-2 hover:bg-white/10 rounded-lg ${errorTextColor} opacity-60 hover:opacity-100 transition-all disabled:opacity-20`}
-                                title={t('ui.clear')}
-                            >
-                                {isCleaning === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                            </button>
+                            <div className="flex items-center gap-1">
+                                {item.id === 'lyrics' && (
+                                    <button
+                                        type="button"
+                                        data-ponder-lyric-export-settings-entry
+                                        onClick={() => {
+                                            openCommandPaletteCommand(LYRIC_EXPORT_COMMAND_ID);
+                                            closeSettings();
+                                        }}
+                                        className="p-2 hover:bg-white/10 rounded-lg opacity-60 hover:opacity-100 transition-all"
+                                        title={t('lyricExport.settingsEntry')}
+                                        aria-label={t('lyricExport.settingsEntry')}
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => onClear(item.id)}
+                                    disabled={isCleaning === item.id}
+                                    className={`p-2 hover:bg-white/10 rounded-lg ${errorTextColor} opacity-60 hover:opacity-100 transition-all disabled:opacity-20`}
+                                    title={t('ui.clear')}
+                                >
+                                    {isCleaning === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
