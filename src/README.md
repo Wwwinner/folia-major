@@ -43,11 +43,12 @@ App.tsx
 | 功能 | 第一入口 | 继续看 |
 | --- | --- | --- |
 | 应用壳和窗口行为 | `components/app/AppShell.tsx` | `TitlebarDragZone.tsx`、`WindowControls.tsx` |
-| 首页 | `components/app/Home.tsx` | `home/buildHomeModel.ts`、`home/GridViewOverlayHost.tsx` |
+| 首页 | `components/app/Home.tsx` | `home/buildHomeModel.ts`、`library/app/GridViewOverlayHost.tsx` |
 | Player panel | `components/app/PlayerPanel.tsx` | `player-panel/buildPlayerPanelModel.ts`、`createQueueMutations.ts` |
 | overlays | `components/app/overlays/AppOverlays.tsx` | `buildAppOverlaysModel.ts`、`search/*` |
 | dialogs | `components/app/dialogs/AppDialogs.tsx` | `buildAppDialogsModel.ts`、`buildSettingsDialogModel.ts` |
-| Home 导航和 surface | `components/app/home/*` | `gridViewCollectionAdapters.ts`、`LocalGrid3DView.tsx`、`NavidromeGrid3DView.tsx` |
+| Home 导航和 surface | `components/app/home/*` | `gridViewCollectionAdapters.ts`；本地 / Navidrome 首页在 `library/suites/grid/home/` |
+| 饭角公开发现与收听历史 | `components/app/home/OnlineDiscoveryHome.tsx`、`EpisodeHistoryPage.tsx` | 网格首页挂载；页签规则在 `library/core/model/homeSources.ts` |
 | 播放恢复和 URL | `components/app/playback/*` | `restorePlaybackSource.ts`、`createOnlineRecoveryController.ts` |
 | 搜索 | `components/app/search/SearchWorkspace.tsx` | `SearchResultsList.tsx`、`searchTrackActions.ts` |
 | app-level 导航 | `components/app/navigation/*` | `createLocalLibraryNavigation.ts`、`createPanelNavigation.ts` |
@@ -57,8 +58,8 @@ App.tsx
 
 ### Components
 
-- 基础/遗留展示组件：`src/components/*.tsx`，例如 `Grid3D.tsx`、`GridView.tsx`、`UnifiedPanel.tsx`、`FloatingPlayerControls.tsx`。
-- 网格性能和导航：`src/components/folia-grid/*`。
+- 基础/遗留展示组件：`src/components/*.tsx`，例如 `UnifiedPanel.tsx`、`FloatingPlayerControls.tsx`。
+- 集合浏览（Library）：`src/library/`——`core/`（契约、纯变换、资源、状态、hooks）、`suites/grid/`（`Grid3D`、`GridView`、`GridMap`、`ArtistGridView`、hex 视口与卡片、打开转场）、`suites/tui/`、`app/`（集合宿主与端口）。
 - 本地库实体编辑：`src/components/local-library-entity/*`。
 - 命令面板：`src/components/command-palette/*`。
 - 设置和业务弹窗：`src/components/modal/*`、`src/components/modal/settings/*`。
@@ -70,7 +71,7 @@ App.tsx
 ### Hooks and stores
 
 - 播放桥接：`usePlaybackAudioBridge`、`usePlaybackTransportController`、`usePlaybackQueueController`、`usePlaybackInteractionBridge`、`usePlaybackUiEffects`、`usePlaybackVisualizerBridge`。
-- 本地和在线库：`useLocalLibraryCatalog`、`useNeteaseLibrary`、`useKugouLibrary`、`useQqLibrary`、`useOnlineProviderPlatform`、`useOnlineProviderQrLogin`。
+- 本地和在线库：`useLocalLibraryCatalog`、`useNeteaseLibrary`、`useKugouLibrary`、`useQqLibrary`；在线账户的扫码登录、选平台、切换确认与登出在 Library Core 的账户 controller（`library/app/useLibraryAccountController`、`library/core/services/providerAccountController`）。
 - 外部 surface：`useStagePlaybackController`、`useNowPlayingSource`、`usePlayerCapSource`、`useObsBrowserSourcePublisher`。
 - 恢复、主题和窗口：`useSessionRestoreController`、`useThemeController`、`useAppPreferences`、Electron bridge hooks。
 - 导航/搜索/集合：`useAppNavigation.ts`、`useSearchNavigationStore.ts`、`useCollectionNavigationStore.ts`。
@@ -96,7 +97,7 @@ App.tsx
 - grapheme timing：`utils/lyrics/graphemeTiming.ts`。
 - 共享字体、颜色、播放身份：`utils/fontStacks.ts`、`components/visualizer/colorMix.ts`、`utils/appPlaybackGuards.ts`。
 - Visualizer 共享入口、契约和运行时：`components/visualizer/VisualizerRenderer.tsx`、`definition.ts`、`registry.tsx`、`tuningRegistry.ts`、`runtime.ts`、`VisualizerShell.tsx`。
-- 模式清单与具体入口：`components/visualizer/<mode>/entry.tsx`；当前有 `classic`、`cadenza`、`partita`、`fume`、`cappella`、`tilt`、`claddagh`、`monet`、`dialogue`、`diorama`、`pendolo`、`sonnet`、`tempera`。
+- 模式清单与具体入口：`components/visualizer/<mode>/entry.tsx`；当前有 `classic`、`cadenza`、`partita`、`fume`、`cappella`、`tilt`、`claddagh`、`monet`、`dialogue`、`diorama`、`pendolo`、`sonnet`、`tempera`、`lumiere`。
 - 背景 registry：`components/visualizer/backgrounds/registry.tsx`；当前 entry 有 `common`、`latent`、`monet`、`nomand`、`sora`、`url`。
 - 模式设置：优先看各模式目录的 `tuning.ts` / `*SettingsPanel.tsx`，再看 `VisPlaygroundSettingsPanel.tsx`。
 

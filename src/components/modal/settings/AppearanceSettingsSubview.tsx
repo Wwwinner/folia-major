@@ -234,6 +234,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
         pendoloTuning: state.pendoloTuning,
         sonnetTuning: state.sonnetTuning,
         temperaTuning: state.temperaTuning,
+        lumiereTuning: state.lumiereTuning,
         urlBackgroundList: state.urlBackgroundList,
         urlBackgroundSelectedId: state.urlBackgroundSelectedId,
         handleSetVisualizerMode: state.handleSetVisualizerMode,
@@ -259,6 +260,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
         handleSetPendoloTuning: state.handleSetPendoloTuning,
         handleSetSonnetTuning: state.handleSetSonnetTuning,
         handleSetTemperaTuning: state.handleSetTemperaTuning,
+        handleSetLumiereTuning: state.handleSetLumiereTuning,
         handleAddUrlBackgroundItem: state.handleAddUrlBackgroundItem,
         handleUpdateUrlBackgroundItem: state.handleUpdateUrlBackgroundItem,
         handleSetUrlBackgroundList: state.handleSetUrlBackgroundList,
@@ -427,6 +429,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
             if (has('subtitleContentMode')
                 && (config.subtitleContentMode === 'translation'
                     || config.subtitleContentMode === 'romanization'
+                    || config.subtitleContentMode === 'both'
                     || config.subtitleContentMode === 'none')) {
                 storeTypographySettings.handleSetSubtitleContentMode(config.subtitleContentMode);
             }
@@ -523,6 +526,7 @@ const AppearanceSettingsSubview: React.FC<AppearanceSettingsSubviewProps> = ({
                 if (has('pendoloTuning') && config.pendoloTuning) storeVisualizer.handleSetPendoloTuning(config.pendoloTuning);
                 if (has('sonnetTuning') && config.sonnetTuning) storeVisualizer.handleSetSonnetTuning(config.sonnetTuning);
                 if (has('temperaTuning') && config.temperaTuning) storeVisualizer.handleSetTemperaTuning(config.temperaTuning);
+                if (has('lumiereTuning') && config.lumiereTuning) storeVisualizer.handleSetLumiereTuning(config.lumiereTuning);
             }
 
             if (has('desktopLyricsAppearance') && config.desktopLyricsAppearance) void useDesktopLyricsStore.getState().setAppearance(config.desktopLyricsAppearance);

@@ -7,6 +7,7 @@ import { loadOnlineLyricsState, markOnlineLyricsPureMusic, resolveOnlineLyrics, 
 import { autoMatchBestLyric } from '../utils/lyrics/autoMatchBestLyric';
 import { createSafeObjectUrl } from '../utils/blobGuards';
 import type { AudioQualityPreference, MediaId } from '../types/onlineMusic';
+import { OnlineProviderError, type ProviderErrorCode } from '../types/onlineMusic';
 import { omni } from './onlineMusic/omni';
 import { getSongResourceCacheKey } from './onlineMusic/resourceKeys';
 import { getCachedSongAudioBlob, getCachedSongReplayGain, getSongCacheWithLegacyMigration } from './onlineMusic/resourceCache';
@@ -22,7 +23,7 @@ export async function loadOnlineSongAudioSource(
     prefetched: PrefetchedSongData | null
 ): Promise<
     | { kind: 'ok'; audioSrc: string; blobUrl?: string; replayGain?: ReplayGainInfo }
-    | { kind: 'unavailable' }
+    | { kind: 'unavailable'; reason?: ProviderErrorCode }
 > {
     const cachedAudioBlob = await getCachedSongAudioBlob(song);
     if (cachedAudioBlob) {
@@ -53,6 +54,9 @@ export async function loadOnlineSongAudioSource(
     } catch (error) {
         console.warn('[OnlinePlayback] Provider audio source is temporarily unavailable', error);
         // 请求失败保留原来的分类；权限、配置与网络错误不等于服务端确认没有可用音源。
+        if (error instanceof OnlineProviderError && ['preview-only', 'region-restricted', 'auth-required'].includes(error.code)) {
+            return { kind: 'unavailable', reason: error.code };
+        }
         throw error;
     }
     const url = toSafePlaybackUrl(source?.url);

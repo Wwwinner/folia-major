@@ -8,6 +8,7 @@ import { CustomSelect } from '../../shared/CustomSelect';
 import PinnedCommandSettings from './PinnedCommandSettings';
 import PonderHintSettingsSection from './PonderHintSettingsSection';
 import PlaybackEntryViewSection from './PlaybackEntryViewSection';
+import LibrarySuiteSection from './LibrarySuiteSection';
 import PlayerBottomBarSection from './PlayerBottomBarSection';
 import HomeCardPositionSection from './HomeCardPositionSection';
 import { SettingsAnchor } from './navigation/SettingsAnchorContext';
@@ -59,7 +60,6 @@ const GeneralSettingsSubview: React.FC<GeneralSettingsSubviewProps> = ({
         handleToggleHomeTabAlbums: state.handleToggleHomeTabAlbums,
         handleToggleHomeTabLocal: state.handleToggleHomeTabLocal,
     })));
-
     const getResolvedLanguageLabel = (): string => {
         const lang = i18n.resolvedLanguage;
         if (lang?.startsWith('zh')) {
@@ -188,6 +188,12 @@ const GeneralSettingsSubview: React.FC<GeneralSettingsSubviewProps> = ({
             <HomeCardPositionSection isDaylight={isDaylight} settingsCardClass={settingsCardClass} theme={theme} />
 
             <PlaybackEntryViewSection
+                isDaylight={isDaylight}
+                settingsCardClass={settingsCardClass}
+                theme={theme}
+            />
+
+            <LibrarySuiteSection
                 isDaylight={isDaylight}
                 settingsCardClass={settingsCardClass}
                 theme={theme}

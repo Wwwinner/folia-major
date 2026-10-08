@@ -78,7 +78,7 @@ describe('online audio ReplayGain plumbing', () => {
         isUrlValidMock.mockReturnValue(true);
     });
 
-    it.each(['not-playable', 'auth-required', 'network', 'unavailable'] as const)(
+    it.each(['not-playable', 'network', 'unavailable'] as const)(
         'preserves %s errors instead of reporting a missing song', async code => {
             const error = new OnlineProviderError(code, 'Provider-specific reason', 'fanjiao');
             sourceMock.mockRejectedValueOnce(error);
@@ -90,6 +90,12 @@ describe('online audio ReplayGain plumbing', () => {
     it('keeps an explicit missing audio source distinct from a request error', async () => {
         sourceMock.mockResolvedValueOnce(null);
         await expect(loadOnlineSongAudioSource(song, 'high', null)).resolves.toEqual({ kind: 'unavailable' });
+    });
+
+    it.each(['preview-only', 'region-restricted', 'auth-required'] as const)('preserves %s for the queue and does not cache audio', async reason => {
+        sourceMock.mockRejectedValueOnce(new OnlineProviderError(reason, 'Playback unavailable', 'bodian'));
+        await expect(loadOnlineSongAudioSource(song, 'high', null)).resolves.toEqual({ kind: 'unavailable', reason });
+        expect(updatePrefetchedAudioUrlMock).not.toHaveBeenCalled();
     });
 
     it('returns provider metadata and stores it with the prefetched URL', async () => {

@@ -8,6 +8,12 @@ test('先显示持久缓存，再后台更新并保存新首页', async ({ mount
     await page.getByRole('button', { name: '完成饭角请求' }).click();
     await expect(page.getByText('fanjiao 网络新首页 0', { exact: true })).toBeVisible();
     await expect(page.getByTestId('cache-loading')).toHaveText('false');
+    // UI 更新早于后台 IndexedDB 写入；确认提交完成再模拟重启。
+    await expect.poll(() => page.evaluate(async () => {
+        const path = '/src/services/onlineMusic/providerHomeCache.ts';
+        const { loadProviderHomeSnapshot } = await import(/* @vite-ignore */ path);
+        return (await loadProviderHomeSnapshot('fanjiao'))?.items[0]?.title;
+    })).toBe('fanjiao 网络新首页 0');
     await page.reload();
     await mount('discoveryCache');
     await expect(page.getByText('fanjiao 网络新首页 0', { exact: true })).toBeVisible();

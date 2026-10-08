@@ -16,6 +16,14 @@ import { useEpisodePlaybackStore } from '../../../stores/useEpisodePlaybackStore
 export const playbackCommands: CommandPaletteCommand[] = [
     executeModeCommand,
     queueCommand,
+    createToggleCommand(
+        'queue-keep-open',
+        'playback',
+        'Keep queue palette open',
+        'Toggle keeping the command palette open after choosing a queue song',
+        ['stay open', 'keep queue open', '切歌不关闭', '队列保持打开'],
+        context => context.playback.setQueuePaletteKeepOpen(!context.playback.queuePaletteKeepOpen),
+    ),
     volumeCommand,
     fmModeCommand,
     createToggleCommand('playback-main-episodes', 'playback', 'Toggle main episode navigation',

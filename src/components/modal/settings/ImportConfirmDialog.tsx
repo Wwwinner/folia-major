@@ -104,6 +104,7 @@ const TUNING_MODES: Record<string, string> = {
     pendoloTuning: 'pendolo',
     sonnetTuning: 'sonnet',
     temperaTuning: 'tempera',
+    lumiereTuning: 'lumiere',
 };
 
 interface BoxTone {

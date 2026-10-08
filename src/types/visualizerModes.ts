@@ -20,6 +20,7 @@ export const BUILTIN_VISUALIZER_MODES = [
     'dialogue',
     'diorama',
     'fume',
+    'lumiere',
     'monet',
     'partita',
     'pendolo',
