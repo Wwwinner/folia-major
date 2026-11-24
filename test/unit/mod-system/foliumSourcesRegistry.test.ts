@@ -81,9 +81,10 @@ afterEach(() => {
 });
 
 describe('the Folium version, two tracks (plan §9)', () => {
-    it('a folium 1 mod reads 1.10 and has nothing of Folium 2; a folium 2 mod reads 2.0 and has sources and i18n', () => {
+    it('a folium 1 mod reads 1.10 and has nothing of Folium 2; a folium 2 mod reads 2.1 and has sources and i18n', () => {
         const one = createFoliumClientApi(mod({ folium: 1, kind: 'standard', sources: undefined }), clientApiOptions('main'));
         expect(one.host.folium).toEqual({ major: 1, minor: 10 });
+        expect('playSongWithQueue' in one.playback).toBe(false);
         expect('sources' in one).toBe(false);
         expect('i18n' in one).toBe(false);
         expect('capability' in one.omni).toBe(false);
@@ -94,7 +95,8 @@ describe('the Folium version, two tracks (plan §9)', () => {
         expect(typeof one.lyrics.parse).toBe('function');
         expect(typeof one.lyrics.getLines).toBe('function');
         const two = createFoliumClientApi(mod({ kind: 'standard', sources: undefined }), clientApiOptions('export'));
-        expect(two.host.folium).toEqual({ major: 2, minor: 0 });
+        expect(two.host.folium).toEqual({ major: 2, minor: 1 });
+        expect(typeof two.playback.playSongWithQueue).toBe('function');
         expect(two.sources.supports('search', 1)).toBe(true);
         expect(two.sources.supports('playback.surface', 1)).toBe(true);
         expect(two.sources.supports('playback.surface', 2)).toBe(false);

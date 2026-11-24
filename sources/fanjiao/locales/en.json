@@ -1,0 +1,9 @@
+{
+    "sourceName": "Fanjiao",
+    "notConfigured": "Fanjiao signing credentials are missing. Set FANJIAO_SIGNATURE_SECRET_FILE, then restart Folia.",
+    "notPlayable": "This episode cannot be played right now.",
+    "requestFailed": "The request failed. Try again later.",
+    "playbackFailed": "Playback failed. Try again later.",
+    "unsupportedPlayback": "This environment does not support this kind of playback.",
+    "nothingToContinue": "No Fanjiao episodes to continue yet."
+}

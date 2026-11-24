@@ -17,6 +17,7 @@ import {
     collectionKey,
     GridViewCollectionDescriptor,
     LocalGridViewCollectionDescriptor,
+    type OnlineGridViewCollectionDescriptor,
     isLocalGridViewCollection,
     isNavidromeGridViewCollection,
     refreshLocalGridViewCollection,
@@ -59,6 +60,7 @@ import {
     forgetLibraryLayouts,
     hasLibrarySuiteChoice,
     listLibrarySuiteOverlays,
+    resolveLibraryPlaylistAlbums,
     resolveLibraryStage,
     resolveLibrarySurface,
 } from '../registry';
@@ -66,6 +68,7 @@ import { resolveLibraryLayerPresentation } from '../core/suite/libraryStage';
 import { projectNavigationTrail, resolveCollectionPush } from '../core/collection/collectionNavigation';
 import { LIBRARY_HOME_SESSION_KEY } from './librarySuiteChoice';
 import LibrarySuiteStageSlot from './LibrarySuiteStageSlot';
+import PlaylistAlbumsSurface from './PlaylistAlbumsSurface';
 
 // src/library/app/GridViewOverlayHost.tsx
 // Hosts the GridView overlay outside Grid3D so it can be opened/restored independently.
@@ -216,7 +219,16 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
     const isDaylight = useThemeSettingsStore(state => state.isDaylight);
     const localLibraryCatalog = surfaceProps.localLibraryCatalog;
     const selectedCollection = getActiveGridViewCollection(collectionSnapshot);
+    const albumPlaylist = collectionSnapshot?.stack.find((entry): entry is OnlineGridViewCollectionDescriptor => (
+        entry.source === 'online' && entry.type === 'playlist' && entry.playlistContents === 'albums'
+    ));
+    const isAlbumPlaylist = albumPlaylist !== undefined && albumPlaylist === selectedCollection;
     const suiteId = useLibrarySuiteStore(state => state.suite);
+    const AlbumPlaylistWall = resolveLibraryPlaylistAlbums(suiteId);
+    const showAlbumList = isAlbumPlaylist && !AlbumPlaylistWall;
+    // The fallback list has no suite transition target when opening or closing a child album.
+    const isOverAlbumPlaylist = albumPlaylist !== undefined && collectionSnapshot?.stack.at(-2) === albumPlaylist;
+    const suppressSuiteTransitions = !AlbumPlaylistWall && (isAlbumPlaylist || isOverAlbumPlaylist);
     // 集合层与歌手页都由选中的 suite 渲染（它没实现那个 surface 时回退网格；P4.3 起 TUI 也实现了歌手页）。
     const collectionSurface = resolveLibrarySurface('collection', suiteId);
     const artistSurface = resolveLibrarySurface('artist', suiteId);
@@ -226,15 +238,18 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
     const transitionOwner = transitionSurface === 'artist' ? artistSurface : collectionSurface;
     // 背景板和转场启用状态由实际渲染这一层的 suite 解析；未声明背景板时使用中性淡入淡出。
     const backdrop = useLibraryBackdrop(transitionOwner.transitions?.backdrop);
-    const activeTransitions = backdrop.enabled ? transitionOwner.transitions : undefined;
+    const activeTransitions = backdrop.enabled && !suppressSuiteTransitions ? transitionOwner.transitions : undefined;
     // 生效 suite 的 stage（B1；grid / TUI 没有，未知 id 回退 grid 也没有）。当前层由带 stage 的 suite 渲染时，
     // 画面归 stage：不垫背景板、不藏首页。当前层回退到 grid 时与没有 stage 一样。
     const stage = resolveLibraryStage(suiteId);
-    const layerPresentation = resolveLibraryLayerPresentation({
-        hasOpenLayer: Boolean(selectedCollection),
-        stageSuiteId: stage?.suiteId ?? null,
-        layerSuiteId: transitionOwner.suiteId,
-    });
+    // Only the fallback list paints its own background over the home surface.
+    const layerPresentation = showAlbumList
+        ? { showBackdrop: true, hideHome: true }
+        : resolveLibraryLayerPresentation({
+            hasOpenLayer: Boolean(selectedCollection),
+            stageSuiteId: stage?.suiteId ?? null,
+            layerSuiteId: transitionOwner.suiteId,
+        });
     const stageNavigation = useMemo(() => toNavigationContext(collectionSnapshot), [collectionSnapshot]);
     // What is under a page: the home grid and the Explore page (`children`). Home put up while
     // the poster wall is being left for a page has that page over it from its first frame, and
@@ -330,7 +345,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
     // 宿主持有集合资源，网格（以及别的 renderer）只订阅它：切换 renderer 不会重新请求。
     // 宿主自己不订阅快照，所以分页到达不会让首页这棵大树重渲染。歌手页同理，见下面的 artistResource。
     const collectionResource = useCollectionResource({
-        descriptor: liveSelectedCollection && liveSelectedCollection.type !== 'artist' ? liveSelectedCollection : null,
+        descriptor: liveSelectedCollection && liveSelectedCollection.type !== 'artist' && !isAlbumPlaylist ? liveSelectedCollection : null,
         currentUserId: surfaceProps.user?.id,
         localTracks,
         // Folia 歌单的条目还没读到：资源是加载中，不是「就绪的空歌单」（读失败了就不再等，按空的显示，错误在日志里）。
@@ -681,7 +696,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
     // 变更动作控制器：宿主按集合会话创建与释放，自己不订阅快照（不会因进行中的状态重渲染首页）。
     // 交给集合 surface：网格与 TUI 都订阅它（换 suite 不重建，订阅状态、进行中的删除都留在这里）。
     const collectionMutations = useCollectionMutations({
-        descriptor: liveSelectedCollection && liveSelectedCollection.type !== 'artist' ? liveSelectedCollection : null,
+        descriptor: liveSelectedCollection && liveSelectedCollection.type !== 'artist' && !isAlbumPlaylist ? liveSelectedCollection : null,
         resource: collectionResource,
         port: mutationPort,
         currentUserId: surfaceProps.user?.id,
@@ -763,17 +778,19 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
                 {isSurfaceMounted && children(openGridView, isInteractive && !selectedCollection)}
             </div>
             {/* 生效 suite 的常驻舞台：首页之上、背景板与集合层之下；始终占这个位置，打开 / 关闭集合不重挂。 */}
-            <LibrarySuiteStageSlot
-                stage={stage}
-                isInteractive={isInteractive}
-                theme={surfaceProps.theme}
-                isDaylight={isDaylight}
-                navigation={stageNavigation}
-                onBackToPlayer={surfaceProps.onBackToPlayer}
-                onTogglePlayback={surfaceProps.onTogglePlayback}
-                onEnterPlaybackView={surfaceProps.onEnterPlaybackView}
-                onOpenLattice={surfaceProps.onOpenLattice}
-            />
+            <div style={{ visibility: showAlbumList ? 'hidden' : undefined }}>
+                <LibrarySuiteStageSlot
+                    stage={stage}
+                    isInteractive={isInteractive && !showAlbumList}
+                    theme={surfaceProps.theme}
+                    isDaylight={isDaylight}
+                    navigation={stageNavigation}
+                    onBackToPlayer={surfaceProps.onBackToPlayer}
+                    onTogglePlayback={surfaceProps.onTogglePlayback}
+                    onEnterPlaybackView={surfaceProps.onEnterPlaybackView}
+                    onOpenLattice={surfaceProps.onOpenLattice}
+                />
+            </div>
             <AnimatePresence initial={false}>
                 {layerPresentation.showBackdrop && (
                     <motion.div
@@ -791,7 +808,20 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
                 )}
             </AnimatePresence>
             <AnimatePresence initial={false}>
-                {displaySelectedCollection && (
+                {albumPlaylist && (
+                    <PlaylistAlbumsSurface
+                        key={`host-playlist-albums:${collectionKey(albumPlaylist)}`}
+                        collection={albumPlaylist}
+                        Wall={AlbumPlaylistWall}
+                        visible={isAlbumPlaylist}
+                        isInteractive={isInteractive && isAlbumPlaylist}
+                        onBack={handleBackCollection}
+                        onDone={handleDoneCollection}
+                        onPopTo={onPopCollectionTo}
+                        onOpenAlbum={(id, album) => { void handlePushAlbumCollection(id, album); }}
+                    />
+                )}
+                {displaySelectedCollection && !isAlbumPlaylist && (
                     // key 带上实际渲染它的 suite：切换 suite 时集合层换一个实例；两个都回退到网格的 suite 之间
                     // 切换（例如歌手页）不重新挂载。Suspense 给 lazy 的 suite 组件用，即时组件不会挂起。
                     displaySelectedCollection.type === 'artist' ? (
@@ -841,7 +871,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
                 mounted (the grid's cover lands on it in that commit), and a component later in the
                 tree has its layout effects run later. */}
             {SUITE_OVERLAYS.map(({ suiteId: overlaySuiteId, Overlay }) => (
-                <Overlay key={overlaySuiteId} enabled={backdrop.enabled && transitionOwner.suiteId === overlaySuiteId} />
+                <Overlay key={overlaySuiteId} enabled={backdrop.enabled && !suppressSuiteTransitions && transitionOwner.suiteId === overlaySuiteId} />
             ))}
             {/* 首页上也有（切换的是首页 surface；没有集合会话要冲刷，用首页的固定 key）；歌手页上也有（P4.3 起 TUI 实现了歌手页，
                 冲刷的是这一层歌手页的会话——键与歌手资源的 key 相同）。 */}

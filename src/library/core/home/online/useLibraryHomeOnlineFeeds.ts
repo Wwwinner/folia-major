@@ -15,7 +15,7 @@ import type {
 // 这里不在卸载时放掉归属：资源属于首页宿主，换 suite（旧 surface 卸载、新 surface 挂载）时新 surface 设的是
 // 同一个归属、ensure 也不再读；首页真的离开时由宿主放掉（core/home/libraryHomeLifetime.service）。
 
-export const useLibraryHomeFeed = <TData>(resource: LibraryHomeFeedResource<TData>): LibraryHomeFeedSnapshot<TData> => (
+export const useLibraryHomeFeed = <TData, TUserId extends MediaId | null>(resource: LibraryHomeFeedResource<TData, TUserId>): LibraryHomeFeedSnapshot<TData, TUserId> => (
     useSyncExternalStore(resource.subscribe, resource.getSnapshot)
 );
 
@@ -26,9 +26,11 @@ const ownerOf = (providerId: string, userId: MediaId | null | undefined, capable
 type OnlineHomeFeedsAttachment = {
     tab: HomeViewTab;
     providerId: string;
+    /** 当前 provider 的已登录账户：无账户时只有公开推荐可以加载。 */
     userId: MediaId | null | undefined;
     canUseAlbums: boolean;
     canUseRadio: boolean;
+    canBrowsePublicRadio: boolean;
 };
 
 /**
@@ -37,10 +39,10 @@ type OnlineHomeFeedsAttachment = {
  */
 export const attachOnlineHomeFeeds = (
     resources: Pick<LibraryHomeResources, 'favoriteAlbums' | 'radioFeed'>,
-    { tab, providerId, userId, canUseAlbums, canUseRadio }: OnlineHomeFeedsAttachment,
+    { tab, providerId, userId, canUseAlbums, canUseRadio, canBrowsePublicRadio }: OnlineHomeFeedsAttachment,
 ): void => {
     resources.favoriteAlbums.setOwner(ownerOf(providerId, userId, canUseAlbums));
-    resources.radioFeed.setOwner(ownerOf(providerId, userId, canUseRadio));
+    resources.radioFeed.setOwner(canBrowsePublicRadio ? { providerId, userId: null } : ownerOf(providerId, userId, canUseRadio));
     if (tab === 'albums') void resources.favoriteAlbums.ensure();
     if (tab === 'radio') void resources.radioFeed.ensure();
 };
@@ -52,19 +54,14 @@ export const useLibraryHomeOnlineFeeds = ({
     userId,
     canUseAlbums,
     canUseRadio,
-}: {
+    canBrowsePublicRadio,
+}: OnlineHomeFeedsAttachment & {
     resources: Pick<LibraryHomeResources, 'favoriteAlbums' | 'radioFeed'>;
-    tab: HomeViewTab;
-    providerId: string;
-    /** 当前 provider 的已登录账户（没有账户时为 null：两份数据都没有归属）。 */
-    userId: MediaId | null | undefined;
-    canUseAlbums: boolean;
-    canUseRadio: boolean;
 }) => {
     const { favoriteAlbums, radioFeed } = resources;
     useEffect(() => {
-        attachOnlineHomeFeeds({ favoriteAlbums, radioFeed }, { tab, providerId, userId, canUseAlbums, canUseRadio });
-    }, [canUseAlbums, canUseRadio, favoriteAlbums, providerId, radioFeed, tab, userId]);
+        attachOnlineHomeFeeds({ favoriteAlbums, radioFeed }, { tab, providerId, userId, canUseAlbums, canUseRadio, canBrowsePublicRadio });
+    }, [canBrowsePublicRadio, canUseAlbums, canUseRadio, favoriteAlbums, providerId, radioFeed, tab, userId]);
 
     return {
         favoriteAlbums: useLibraryHomeFeed(favoriteAlbums),

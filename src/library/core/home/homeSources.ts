@@ -89,6 +89,19 @@ export const resolveOnlineTabUnavailableReason = (
     return source.canUseRadio ? undefined : { key: 'status.providerRecommendationsUnavailable', values };
 };
 
+/** 已配置且无需账户的音源只开放公开推荐，不因此开放账号曲库。 */
+export const canBrowsePublicRadio = (source: LibraryHomeOnlineSource): boolean => (
+    source.accountView === 'accountless' && source.canUseRadio && source.provider?.availability.configured === true
+);
+
+export const resolveOnlineHomeTab = (
+    tab: LibraryHomeTabKey, source: LibraryHomeOnlineSource, showRadio: boolean,
+): LibraryHomeTabKey => {
+    if (!isOnlineHomeTab(tab)) return tab;
+    if (showRadio && canBrowsePublicRadio(source) && resolveOnlineTabUnavailableReason(source, tab)) return 'radio';
+    return tab === 'explore' && !source.canUseExplore ? 'playlist' : tab;
+};
+
 /** 本地曲库为什么不可用（可用时为 undefined）。 */
 export const resolveLocalUnavailableReason = (availability: LibraryHomeLocalAvailability): LibraryHomeMessage | undefined => {
     if (availability.supported) return undefined;

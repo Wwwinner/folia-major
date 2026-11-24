@@ -1,0 +1,9 @@
+{
+    "sourceName": "饭角",
+    "notConfigured": "尚未配置饭角签名凭据。设置 FANJIAO_SIGNATURE_SECRET_FILE 后重启 Folia。",
+    "notPlayable": "这一集暂时不能播放。",
+    "requestFailed": "请求失败，请稍后重试。",
+    "playbackFailed": "播放失败，请稍后重试。",
+    "unsupportedPlayback": "当前环境不支持这种播放方式。",
+    "nothingToContinue": "还没有可以继续收听的饭角分集。"
+}

@@ -66,14 +66,14 @@ const LibraryTuiHome: React.FC<LibraryHomeSurfaceProps> = (props) => {
     const navidromeSection = useNavidromeHomeSectionStore(state => state.section);
     const setNavidromeSection = useNavidromeHomeSectionStore(state => state.setSection);
 
-    const selectTab = (key: LibraryHomeTabKey) => {
+    const selectTab = (key: LibraryHomeTabKey, fromGroup = false) => {
         const target = tabs.find(candidate => candidate.key === key);
         if (!target || target.disabledReason) return false;
         // 与 Grid3D / BravaisHome 相同：原生页签接手时通知宿主（重选当前页签也通知），开着的模组首页页面随之关掉。
         props.onNativeTabSelected?.();
         setPrompt(null);
         if (key !== tab) setAccountsOpen(false);
-        setTab(key);
+        setTab(key, fromGroup);
         return true;
     };
     useLibraryHomeTabsRegistration({
@@ -91,7 +91,7 @@ const LibraryTuiHome: React.FC<LibraryHomeSurfaceProps> = (props) => {
         // 在线来源回到当前的在线页签（不可用时取第一个可用的）。
         const current = group.tabs.find(candidate => candidate.key === tab && !candidate.disabledReason);
         const target = current ?? group.tabs.find(candidate => !candidate.disabledReason);
-        if (target) selectTab(target.key);
+        if (target) selectTab(target.key, true);
     };
 
     // 当前来源下的分区：在线是三个在线页签，本地与 Navidrome 是各自的 section。

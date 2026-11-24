@@ -312,6 +312,32 @@ describe('folium play queue', () => {
         expect(resolveFoliumSongRef(page.items[1].song.ref)).toBe(queue[1]);
     });
 
+    it('starts from a supplied album at its position, without replacing a queue before the player accepts it', async () => {
+        const playSong = vi.fn<FoliumAppActions['playSong']>();
+        render(appActions({ playSong }));
+        const existing = songs(2, 10);
+        usePlaybackStore.setState({ playQueue: existing, isFmMode: true });
+        const playback = createFoliumPlaybackService({ ...mod, folium: 2, permissions: ['playback.control', 'playback.queue'] }, 'main');
+        const album = songs(3, 20);
+        const dto = album.map(item => toFoliumSong(item)!);
+        const options = { queue: dto, expectedVersion: playback.getQueue().version, startAtSec: 42 };
+        const controlOnly = createFoliumPlaybackService({ ...mod, folium: 2, permissions: ['playback.control'] }, 'main');
+        const queueOnly = createFoliumPlaybackService({ ...mod, folium: 2, permissions: ['playback.queue'] }, 'main');
+        await expect(controlOnly.playSongWithQueue(dto[1], options)).rejects.toThrow('permission-denied:playback.queue');
+        await expect(queueOnly.playSongWithQueue(dto[1], options)).rejects.toThrow('permission-denied:playback.control');
+        await expect(playback.playSongWithQueue(dto[1], options)).resolves.toBe(true);
+        const [chosen, queue, start] = playSong.mock.calls[0];
+        expect(chosen).toBe(album[1]);
+        expect(queue).toEqual(album);
+        expect(start?.startAtSec).toBe(42);
+        expect(usePlaybackStore.getState().playQueue).toBe(existing);
+        expect(usePlaybackStore.getState().isFmMode).toBe(true);
+        usePlaybackStore.setState({ playQueue: songs(1, 30) });
+        expect(start?.canStartWithQueue?.()).toBe(false);
+        await expect(playback.playSongWithQueue(dto[1], options)).resolves.toBe(false);
+        expect(playSong).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps every ref of the page it returns when the ref pool is full', async () => {
         const actions = appActions();
         render(actions);

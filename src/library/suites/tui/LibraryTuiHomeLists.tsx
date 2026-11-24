@@ -91,7 +91,7 @@ export const LibraryTuiOnlineList: React.FC<LibraryTuiListCommonProps & {
     const { t } = useTranslation();
     const isGuest = online.accountView === 'guest';
     const showAccounts = isGuest || accountsOpen;
-    const showList = !showAccounts && online.accountView !== 'accountless' && online.accountView !== 'resolving';
+    const showList = !showAccounts && list.showList;
 
     useLibraryHomeListRegistration({
         enabled: showList,
@@ -130,7 +130,7 @@ export const LibraryTuiOnlineList: React.FC<LibraryTuiListCommonProps & {
             />
         );
     }
-    if (online.accountView === 'accountless') {
+    if (online.accountView === 'accountless' && !showList) {
         return (
             <StatusText status="accountless">
                 <span>{t('libraryTui.accountless', { provider: online.providerLabel })}</span>

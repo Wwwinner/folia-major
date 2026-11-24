@@ -69,6 +69,7 @@ export const FOLIUM_SOURCE_MEMBER_DESTINATIONS = Object.freeze({
         raw: 'derived from raw@1',
     } satisfies Destinations<OnlineMusicProvider>,
     OnlineSearchProvider: {
+        supportsSongs: 'search@1.supportsSongs',
         searchSongs: 'search@1.searchSongs',
         searchAlbums: 'search@1.searchAlbums',
         searchPlaylists: 'search@1.searchPlaylists',
@@ -164,6 +165,7 @@ export const FOLIUM_SOURCE_MEMBER_DESTINATIONS = Object.freeze({
         canResolveSongCatalogRefs: 'catalog@1.canResolveSongCatalogRefs',
         resolveSongCatalogRefs: 'catalog@1.resolveSongCatalogRefs',
         getPlaylistTracks: 'catalog@1.getPlaylistTracks',
+        getPlaylistAlbums: 'catalog@1.getPlaylistAlbums',
         getPlaylistDetail: 'catalog@1.getPlaylistDetail',
         getCloudTracks: 'catalog@1.getCloudTracks',
         getListeningRankTracks: 'catalog@1.getListeningRankTracks',

@@ -1,8 +1,8 @@
 import type { LocalSong, SongResult, StatusMessage, Theme } from '../../../types';
-import type { MediaId } from '../../../types/onlineMusic';
+import type { MediaId, ProviderCollection } from '../../../types/onlineMusic';
 import type { LibraryAccountActionId, LibraryAccountController, LibraryAccountSurfaceProps } from '../account/account.contract';
 import type { LibraryArtistResource } from '../artist/artist.contract';
-import type { CollectionNavigationOrigin, LibraryCollectionDescriptor } from '../collection/collection.contract';
+import type { CollectionNavigationOrigin, LibraryCollectionDescriptor, OnlineGridViewCollectionDescriptor } from '../collection/collection.contract';
 import type { LibraryDirectoryBatchController } from '../directory/directory.contract';
 import type { LibraryHomeData } from '../home/home.contract';
 import type { LibraryHomeResources } from '../home/homeModel.contract';
@@ -243,6 +243,18 @@ export type LibraryCollectionSurfaceProps = LibrarySurfaceBaseProps & LibraryCol
     currentUserId?: MediaId | null;
 };
 
+/** Optional suite presentation of album-only playlists. The host retains the pagination session. */
+export type LibraryPlaylistAlbumsSurfaceProps = Pick<LibraryCollectionNavigation, 'onBack' | 'onDone' | 'onPopTo'> & {
+    collection: OnlineGridViewCollectionDescriptor;
+    albums: readonly ProviderCollection[];
+    isInteractive: boolean;
+    loading: boolean;
+    failed: boolean;
+    hasMore: boolean;
+    onLoadPage: () => void;
+    onOpenAlbum: (id: MediaId, album: ProviderCollection) => void;
+};
+
 /**
  * 歌手页 surface：宿主按 collectionKey 持有歌手资源（P4.1 起；详情、热门歌曲、专辑与专辑分页都在资源里，
  * 本地歌手由宿主的 catalog 派生），suite 只订阅。播放仍走播放端口。筛选词与「看到哪一项」在浏览会话里
@@ -452,6 +464,8 @@ export type LibrarySuiteManifest = {
     /** false 时 registry 当它不存在（例如开发版专用的 suite 在生产构建里）。缺省为可用。 */
     available?: boolean;
     surfaces: { readonly [Surface in LibrarySurfaceId]?: LibrarySurfaceDeclaration<LibrarySurfacePropsMap[Surface]> };
+    /** Absent suites use the host's native album list. */
+    playlistAlbums?: LibrarySurfaceComponent<LibraryPlaylistAlbumsSurfaceProps>;
     transitions?: LibrarySuiteTransitions;
     /** 有布局记录的 suite 才给（网格：集合与歌手页的 sessionStorage 记录）。 */
     layout?: LibrarySuiteLayout;

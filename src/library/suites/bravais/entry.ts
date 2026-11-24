@@ -51,6 +51,7 @@ const BravaisStage = React.lazy(() => import('./BravaisStage'));
 const BravaisHome = React.lazy(() => import('./BravaisHome'));
 const BravaisCollection = React.lazy(() => import('./BravaisCollection'));
 const BravaisArtist = React.lazy(() => import('./BravaisArtist'));
+const BravaisPlaylistAlbums = React.lazy(() => import('./BravaisPlaylistAlbums'));
 
 // 集合页（B7 齐了 grid 的 23 个，入口见设计稿 §10.2）：聚焦卡主按钮（播放 / 入队）、文字链接（专辑 / 歌手）与「⋯」
 // （移出 / 不喜欢、手动匹配、加入歌单）；缝里的播放全部 / 入队、过滤输入位（缝自己的，墙上直接打字）、收藏星标、元数据行的续传、
@@ -222,6 +223,7 @@ const bravais: LibrarySuiteManifest = {
     id: 'bravais',
     labelKey: 'libraryBravais.suiteName',
     stage: BravaisStage,
+    playlistAlbums: BravaisPlaylistAlbums,
     // 进 / 出 Lattice 走翻牌交接（设计稿 §7「进入队列」；stage 里的 useBravaisWallHandoff）。
     stageWallHandoff: true,
     surfaces: {

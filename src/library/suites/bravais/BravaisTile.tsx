@@ -14,6 +14,7 @@ import {
 } from './bravaisConstants';
 import { resolveTileTransition, type BravaisEntrance, type BravaisFlipStep } from './bravaisDisplay';
 import type { BravaisItem } from './bravaisLayer';
+import { resolveBravaisTileCover } from './bravaisProjection';
 import { bravaisFaceKey, type BravaisTileKind } from './bravaisLook';
 import BravaisFocusCardBody, { type BravaisFocusCardActions } from './BravaisFocusCardBody';
 import BravaisTileQuickActions, { BRAVAIS_QUICK_ACTIONS_MIN_WIDTH } from './BravaisTileQuickActions';
@@ -276,8 +277,9 @@ function BravaisTile({
     }, []);
 
     // 透着的磁贴不画封面（2026-10-09 起连封面底条也不画），不取图；聚焦卡与普通磁贴按自己的尺寸取图。
+    const posterCover = resolveBravaisTileCover(display, rect.width, rect.height);
     const coverUrl = useWallPosterArtwork(
-        face.seeThrough ? undefined : display?.coverUrl,
+        face.seeThrough ? undefined : posterCover,
         Math.max(rect.width, rect.height) * pixelScale,
     );
     const isTrack = display?.kind === 'track';
@@ -321,7 +323,7 @@ function BravaisTile({
         }
         // 点专辑：记下这张封面此刻的样子，真打开了专辑，封面从这里飞到专辑海报上（bravaisCoverFlight）。
         if (display?.kind === 'album' && event.currentTarget.parentElement) {
-            noteCoverFlightSource(event.currentTarget.parentElement, display.key, slotKey, display.coverUrl);
+            noteCoverFlightSource(event.currentTarget.parentElement, display.key, slotKey, posterCover, display.coverUrl);
         }
         handlers.activate(slotKey);
     };

@@ -9,6 +9,7 @@ import {
     homeCardKind,
     projectCollectionTracks,
     projectHomeCards,
+    resolveBravaisTileCover,
     type TrackDescription,
 } from '@/library/suites/bravais/bravaisProjection';
 
@@ -42,6 +43,23 @@ describe('home cards', () => {
             // 每日推荐类的 feed 是集合，但曲目数未知（0）时标签只写种类。
             { key: 'card:radio:4', kind: 'feed', title: 'Card 4', subtitle: '', coverUrl: undefined, badge: '[feed]' },
         ]);
+    });
+
+    it('chooses the cover for the slot dimensions and falls back to square, then the existing cover', () => {
+        const coverUrl = 'default.jpg';
+        const [complete, noLandscape, noSquare, noVariants] = projectHomeCards([
+            card(1, 'album', { coverUrl, coverVariants: { landscape: 'wide.jpg', portrait: 'tall.jpg', square: 'square.jpg' } }),
+            card(2, 'album', { coverUrl, coverVariants: { portrait: 'tall.jpg', square: 'square.jpg' } }),
+            card(3, 'album', { coverUrl, coverVariants: { portrait: 'tall.jpg' } }),
+            card(4, 'playlist', { coverUrl }),
+        ], { kindLabel: kind => kind, trackCount: count => `${count}` });
+        expect(resolveBravaisTileCover(complete, 400, 200)).toBe('wide.jpg');
+        expect(resolveBravaisTileCover(complete, 200, 300)).toBe('tall.jpg');
+        expect(resolveBravaisTileCover(complete, 200, 200)).toBe('square.jpg');
+        expect(resolveBravaisTileCover(noLandscape, 400, 200)).toBe('square.jpg');
+        expect(resolveBravaisTileCover(noSquare, 400, 200)).toBe(coverUrl);
+        expect(resolveBravaisTileCover(noSquare, 200, 200)).toBe(coverUrl);
+        expect(resolveBravaisTileCover(noVariants, 200, 300)).toBe(coverUrl);
     });
 });
 

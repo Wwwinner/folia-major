@@ -1,0 +1,31 @@
+{
+  "folium": 2,
+  "id": "fanjiao",
+  "name": "饭角",
+  "version": "1.0.0",
+  "author": "Folia",
+  "description": "饭角广播剧：匿名搜剧、分集播放、字幕、推荐与本机收听历史。",
+  "client": "client.mjs",
+  "main": "index.cjs",
+  "locales": "locales",
+  "permissions": ["playback.control", "playback.queue"],
+  "sources": [
+    {
+      "id": "fanjiao",
+      "name": {
+        "zh-CN": "饭角",
+        "en": "Fanjiao",
+        "in": "Fanjiao",
+        "vi": "Fanjiao"
+      },
+      "requires": ["search@1", "catalog@1", "songs@1", "playback.external@1", "lyrics@1", "recommendations@1"],
+      "offByDefault": true,
+      "enableNotice": {
+        "zh-CN": "需要在本机配置饭角签名凭据；不提供饭角账号登录。",
+        "en": "Requires a local Fanjiao signing credential. Fanjiao sign-in is not supported.",
+        "in": "Memerlukan kredensial penandatanganan Fanjiao lokal. Login Fanjiao tidak didukung.",
+        "vi": "Cần thông tin xác thực chữ ký Fanjiao trên thiết bị. Không hỗ trợ đăng nhập Fanjiao."
+      }
+    }
+  ]
+}

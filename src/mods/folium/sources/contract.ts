@@ -410,12 +410,16 @@ export interface FoliumSourceCollection {
     name: string;
     /** Its cover. */
     coverUrl?: string;
+    /** Folium 2.1: optional, separately composed covers for wide, tall, and square slots. `coverUrl` remains the default. */
+    coverVariants?: Readonly<{ landscape?: string; portrait?: string; square?: string }>;
     /** The source's description. */
     description?: string;
     /** Songs in it. */
     trackCount?: number;
     /** An artist's albums. */
     albumCount?: number;
+    /** Folium 2.1: a playlist of albums, opened through `catalog@1.getPlaylistAlbums` rather than `getPlaylistTracks`. */
+    playlistContents?: 'albums';
     /** The account made it. */
     isOwned?: boolean;
     /** Who made it. */
@@ -457,6 +461,8 @@ export type FoliumSourceAccess = 'anonymous' | 'account';
 export interface FoliumSourceSearch {
     /** Whether searching needs an account; read when the host builds its search sources. May be a getter. */
     readonly access?: FoliumSourceAccess;
+    /** Folium 2.1: set to `false` for collection-only search. The search page and Omni skip `searchSongs`. */
+    readonly supportsSongs?: false;
     /** Songs for `query`, `limit` from `offset`. */
     searchSongs(query: string, limit: number, offset: number, context?: FoliumSourceSearchContext): Promise<FoliumSourcePage<FoliumSourceSong>>;
     /** Albums (`type: 'album'`); left out where the source has no album search. */
@@ -1017,6 +1023,8 @@ export interface FoliumSourceCatalog {
     resolveSongCatalogRefs?(song: FoliumSourceSong): Promise<FoliumSourceSong>;
     /** A playlist's songs. */
     getPlaylistTracks?(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceSong>>;
+    /** Folium 2.1: the albums in a playlist with `playlistContents: 'albums'`, in the source's order. */
+    getPlaylistAlbums?(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceCollection>>;
     /** A playlist's details. */
     getPlaylistDetail?(id: string, collection?: FoliumSourceCollection): Promise<FoliumSourceCollection | null>;
     /** The cloud songs. */

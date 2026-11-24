@@ -17,7 +17,7 @@
 import type { FoliumI18nService, FoliumSourcesService } from './sources/contract';
 
 /** The Folium version this host implements; mods read it at runtime as `folium.host.folium`. */
-export const FOLIUM_VERSION = Object.freeze({ major: 2, minor: 0 });
+export const FOLIUM_VERSION = Object.freeze({ major: 2, minor: 1 });
 
 /** `modid:name`, like a Forge ResourceLocation. The mod id part is added by the host. */
 export type FoliumId = string;
@@ -1355,6 +1355,16 @@ export interface FoliumPlaybackService {
     previous(): void;
     /** Plays a song by its host `ref`. Resolves false when the ref is unknown. Needs `playback.control`. */
     playSong(song: FoliumSong): Promise<boolean>;
+    /**
+     * Folium 2.1: starts the song in the given ordered queue as if the user
+     * chose it from a collection. Check `folium.host.folium.minor >= 1` on a Folium 2 host.
+     * The song must be in `queue`. The queue version is checked before
+     * playback starts; a cancelled start leaves the old queue in place. `startAtSec` applies to
+     * local, Navidrome, and external players. False for stale refs, stale versions, or Stage playback
+     * with a supplied queue; true means the request reached the player, not that media played.
+     * Needs `playback.control` and `playback.queue`.
+     */
+    playSongWithQueue(song: FoliumSong, options: { queue: readonly FoliumSong[]; expectedVersion: string; startAtSec?: number }): Promise<boolean>;
     /**
      * Adds a song (by `ref`) to the queue the way the user's queue-add setting says (next or last), as the
      * host's own add does: a song already queued moves there; the song playing now, and a song its source

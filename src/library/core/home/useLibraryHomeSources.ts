@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import type { HomeViewTab } from '../../../types';
@@ -10,7 +10,7 @@ import type {
     LibraryHomeTabView,
 } from './homeModel.contract';
 import type { LibraryAccountController } from '../account/account.contract';
-import { homeGroupOfTab, isOnlineHomeTab, resolveHomeGroups, resolveHomeOnlineSource, resolveHomeTabs, translateHomeTabs } from './homeSources';
+import { homeGroupOfTab, isOnlineHomeTab, resolveHomeGroups, resolveHomeOnlineSource, resolveHomeTabs, resolveOnlineHomeTab, translateHomeTabs } from './homeSources';
 import { resolveActiveProviderSummary } from '../account/accountRules';
 import { readOnlineProviderCapabilities, readOnlineProviderLabel } from './online/onlineHomeProvider.service';
 import { useSearchNavigationStore } from '../../../stores/useSearchNavigationStore';
@@ -31,7 +31,7 @@ import { useLibraryAccountProviders } from '../account/useLibraryAccount';
 
 export type LibraryHomeSources = {
     tab: HomeViewTab;
-    setTab: (tab: HomeViewTab) => void;
+    setTab: (tab: HomeViewTab, fromGroup?: boolean) => void;
     isOnlineTab: boolean;
     online: LibraryHomeOnlineSource;
     /** 全部的页，按页签条的顺序（各组的页挨着）。 */
@@ -68,12 +68,12 @@ export const useLibraryHomeSources = ({
     folia?: boolean;
 }): LibraryHomeSources => {
     const { t } = useTranslation();
-    const { storedTab, rememberedOnlineTab, setTab } = useSearchNavigationStore(useShallow(state => ({
+    const { storedTab, rememberedOnlineTab, setStoredTab } = useSearchNavigationStore(useShallow(state => ({
         storedTab: state.homeViewTab,
         rememberedOnlineTab: state.homeOnlineTab,
-        setTab: state.setHomeViewTab,
+        setStoredTab: state.setHomeViewTab,
     })));
-    const tab = storedTab === 'folia' && !folia ? rememberedOnlineTab : storedTab;
+    const requestedTab = storedTab === 'folia' && !folia ? rememberedOnlineTab : storedTab;
     const visibility = useHomeLayoutSettingsStore(useShallow(state => ({
         folia: folia && state.showHomeTabFolia,
         playlist: state.showHomeTabPlaylist,
@@ -102,12 +102,16 @@ export const useLibraryHomeSources = ({
         canListPlaylists, explore, personalFmModes, provider, providerId, recommendations, userAlbums, userLibrary,
     ]);
 
-    // The explore tab is gone after a switch to a provider without one, and a stored choice of it
-    // may be older than the switch.
+    const tab = resolveOnlineHomeTab(requestedTab, online, visibility.radio);
+    const setTab = useCallback((key: HomeViewTab, fromGroup = false) => {
+        const publicFallback = fromGroup && key === 'radio'
+            && resolveOnlineHomeTab(rememberedOnlineTab, online, visibility.radio) === 'radio';
+        setStoredTab(publicFallback ? rememberedOnlineTab : key);
+    }, [online, rememberedOnlineTab, setStoredTab, visibility.radio]);
     useEffect(() => {
-        // 只改存着的就是 explore 的情形：存的是 Folia、这里只是按在线组记住的页显示时不写（见 folia 参数）。
-        if (storedTab === 'explore' && !online.canUseExplore) setTab('playlist');
-    }, [online.canUseExplore, setTab, storedTab]);
+        // 沿用旧探索页的回落规则；临时显示公开推荐不改写用户记住的页签。
+        if (storedTab === 'explore' && tab === 'playlist') setStoredTab('playlist');
+    }, [setStoredTab, storedTab, tab]);
 
     const localAvailability = getLocalLibraryAvailability();
     const tabs = useMemo(() => translateHomeTabs(resolveHomeTabs({

@@ -7864,11 +7864,6 @@
       "count": 2
     }
   },
-  "src/library/core/home/online/onlineHomeFeeds.service.ts": {
-    "@typescript-eslint/no-non-null-assertion": {
-      "count": 4
-    }
-  },
   "src/library/core/home/online/useLibraryHomeOnlineFeeds.ts": {
     "@typescript-eslint/unbound-method": {
       "count": 2

@@ -1,6 +1,7 @@
 import type React from 'react';
 import type {
     LibraryDeclaredActions,
+    LibraryPlaylistAlbumsSurfaceProps,
     LibrarySuiteId,
     LibrarySuiteManifest,
     LibrarySuiteStageProps,
@@ -35,6 +36,10 @@ export const listLibrarySuites = (): readonly LibrarySuiteManifest[] => SUITE_IN
 export const hasLibrarySuite = (suiteId: string): suiteId is LibrarySuiteId => SUITE_INDEX.has(suiteId);
 
 export const getLibrarySuite = (suiteId: string): LibrarySuiteManifest | undefined => SUITE_INDEX.get(suiteId);
+
+export const resolveLibraryPlaylistAlbums = (suiteId: string): React.ComponentType<LibraryPlaylistAlbumsSurfaceProps> | undefined => (
+    SUITE_INDEX.get(SUITE_INDEX.resolveId(suiteId))?.playlistAlbums as React.ComponentType<LibraryPlaylistAlbumsSurfaceProps> | undefined
+);
 
 /**
  * 实际生效的 suite：store 里存的选择可能是这个构建里没有的（初始选择、旧版本的记录），那时生效的是默认 suite。

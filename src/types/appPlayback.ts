@@ -31,12 +31,11 @@ export type PlaybackNavigationOptions = {
      * the play waited and the play's queue was the store's, so the landing leaves the new queue standing.
      */
     queueRewritten?: () => boolean;
+    /** A mod starting from a supplied queue must still own the version it read when the play passes its hooks. */
+    canStartWithQueue?: () => boolean;
     /**
-     * Where a local or Navidrome song starts, in seconds, instead of its beginning: the web route's
-     * deck seeks there once its metadata is in, the HiFi route loads mpv there. Set by the HiFi bridge
-     * when it moves the song it was playing to the other engine (a HiFi failure, HiFi switched off, a
-     * replay after the queue ended), so the listener keeps their place. Only onPlayLocalSong and
-     * onPlayNavidromeSong read it.
+     * Start position in seconds for local, Navidrome or external playback. Local and Navidrome use
+     * it when moving a song between engines; an external player starts at that position itself.
      */
     startAtSec?: number;
     /**

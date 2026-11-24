@@ -16,7 +16,7 @@ import type {
 
 /** 收藏专辑每页取多少（与原 Grid3D 相同）。 */
 export const FAVORITE_ALBUMS_PAGE_SIZE = 50;
-/** 电台页签的推荐歌单数（与原 Grid3D 相同）。 */
+/** 电台页签的推荐集合数（与原 Grid3D 相同）。 */
 export const HOME_FEED_RECOMMENDATION_LIMIT = 35;
 
 export type OnlineHomeFeedDeps = {
@@ -31,8 +31,9 @@ export type OnlineHomeFeedDeps = {
     supportsDailySongs?(providerId: string): boolean;
 };
 
-const sameOwner = (a: LibraryHomeFeedOwner | null, b: LibraryHomeFeedOwner | null) => (
-    a === b || (Boolean(a) && Boolean(b) && a!.providerId === b!.providerId && String(a!.userId) === String(b!.userId))
+const sameOwner = (a: LibraryHomeFeedOwner<MediaId | null> | null, b: LibraryHomeFeedOwner<MediaId | null> | null) => (
+    a === b || (a !== null && b !== null && a.providerId === b.providerId
+        && (a.userId === null || b.userId === null ? a.userId === b.userId : String(a.userId) === String(b.userId)))
 );
 
 // omni 在 provider 切换后会以 AbortError 拒绝旧 provider 的应答；那是预期的作废，不当错误记。
@@ -45,7 +46,7 @@ const isAbortError = (error: unknown) => (
  * 失败时保留已有数据、状态记为 error；ensure 只在这个归属下还没成功读过时才读。
  * isComplete 判为不完整的结果照常显示，但不算「读过」，下次 ensure 再读一遍。
  */
-export const createHomeFeedResource = <TData>({
+export const createHomeFeedResource = <TData, TUserId extends MediaId | null = MediaId>({
     label,
     empty,
     load,
@@ -53,14 +54,14 @@ export const createHomeFeedResource = <TData>({
 }: {
     label: string;
     empty: TData;
-    load: (owner: LibraryHomeFeedOwner, isCurrent: () => boolean) => Promise<TData>;
+    load: (owner: LibraryHomeFeedOwner<TUserId>, isCurrent: () => boolean) => Promise<TData>;
     isComplete?: (data: TData) => boolean;
-}): LibraryHomeFeedResource<TData> => {
-    let snapshot: LibraryHomeFeedSnapshot<TData> = { owner: null, status: 'idle', loaded: false, data: empty };
+}): LibraryHomeFeedResource<TData, TUserId> => {
+    let snapshot: LibraryHomeFeedSnapshot<TData, TUserId> = { owner: null, status: 'idle', loaded: false, data: empty };
     let generation = 0;
     const listeners = new Set<() => void>();
 
-    const commit = (next: LibraryHomeFeedSnapshot<TData>) => {
+    const commit = (next: LibraryHomeFeedSnapshot<TData, TUserId>) => {
         snapshot = next;
         listeners.forEach(listener => listener());
     };
@@ -137,7 +138,7 @@ export const createFavoriteAlbumsFeed = (
 /** 电台 feed 资源：私人 FM 与每日推荐只取封面与数量（卡片由 core/home/homeCards 组装）。 */
 export const createRadioFeed = (
     deps: Pick<OnlineHomeFeedDeps, 'getHomeFeed' | 'songCoverUrl' | 'supportsDailySongs'>,
-): LibraryHomeFeedResource<LibraryHomeRadioFeed | null> => createHomeFeedResource<LibraryHomeRadioFeed | null>({
+): LibraryHomeFeedResource<LibraryHomeRadioFeed | null, MediaId | null> => createHomeFeedResource<LibraryHomeRadioFeed | null, MediaId | null>({
     label: 'radio feed',
     empty: null,
     load: async (owner) => {

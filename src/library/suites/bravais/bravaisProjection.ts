@@ -48,6 +48,7 @@ export const projectHomeCardItem = (
         title: card.name,
         subtitle: [count, card.description].filter(Boolean).join(' · '),
         coverUrl: card.coverUrl,
+        ...(card.coverVariants ? { coverVariants: card.coverVariants } : {}),
         badge: formatCollectionBadge(labels.kindLabel(kind), collectionCount),
     };
     if (collectionCount !== undefined) item.trackCountLabel = labels.trackCount(collectionCount);
@@ -57,6 +58,16 @@ export const projectHomeCardItem = (
 export const projectHomeCards = (cards: readonly LibraryHomeCard[], labels: HomeCardLabels): BravaisItem[] => (
     cards.map(card => projectHomeCardItem(card, labels))
 );
+
+/** 格子有对应构图就用它，否则先用方图，再用集合原来的封面。 */
+export const resolveBravaisTileCover = (item: BravaisItem | null, width: number, height: number): string | undefined => {
+    if (!item) return undefined;
+    const variants = item.coverVariants;
+    const fallback = variants?.square ?? item.coverUrl;
+    if (width > height) return variants?.landscape ?? fallback;
+    if (height > width) return variants?.portrait ?? fallback;
+    return fallback;
+};
 
 /** 一首歌在磁贴与聚焦卡上要的展示字段。 */
 export type TrackDescription = {

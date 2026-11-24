@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayerState, type SongResult } from '@/types';
+import * as external from '@/services/onlineMusic/externalPlayback';
+import { omni } from '@/services/onlineMusic/omni';
 
 // test/unit/playback/queueReplaceRaces.test.ts
 // Pins what the queue controller leaves of a whole-queue write (a mod's folium.playback.replaceQueue, or
@@ -350,6 +352,41 @@ describe('a play that lands after the queue was replaced whole', () => {
         expect(keys(store().playQueue)).toEqual(keys([a, b, c]));
         expect(persistLastPlaybackCache).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'b' }), store().playQueue);
         expect(prefetch.prefetchNearbySongs).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'b' }), store().playQueue, expect.anything(), undefined);
+    });
+});
+
+describe('a requested collection start', () => {
+    it.each(['cancelled by beforePlay', 'superseded by a queue edit'] as const)('leaves the current station alone when %s', async (outcome) => {
+        const original = [f1, f2];
+        playerWith(original, f1, true);
+        const { queue } = mount();
+        const hook = deferred();
+        env.self.beforePlay = hook.promise;
+        const play = queue.playSong(p1, [p1, p2], false, { canStartWithQueue: () => store().playQueue === original });
+        const expectedQueue = outcome === 'superseded by a queue edit' ? [f1, x, f2] : original;
+        if (outcome === 'superseded by a queue edit') setPlayQueue(expectedQueue);
+        env.self.cancelBeforePlay = outcome === 'cancelled by beforePlay';
+        hook.resolve();
+        await play;
+        expect(store().playQueue).toBe(expectedQueue);
+        expect(store().currentSong).toBe(f1);
+        expect(store().isFmMode).toBe(true);
+    });
+
+    it('keeps the position on Retry, but uses zero on a new manual external start', async () => {
+        vi.spyOn(omni, 'canPlayExternally').mockReturnValue(true);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const begin = vi.spyOn(external, 'beginExternalPlayback').mockResolvedValue(undefined)
+            .mockRejectedValueOnce(new Error('media offline'));
+        playerWith([a, b], a);
+        const { queue } = mount();
+        await queue.playSong(p1, [p1], false, { startAtSec: 42 });
+        const retry = status()?.onAction;
+        expect(retry).toBeTypeOf('function');
+        retry?.();
+        await settle();
+        await queue.playSong(p1, [p1]);
+        expect(begin.mock.calls.map(([, seconds]) => seconds)).toEqual([42, 42, 0]);
     });
 });
 

@@ -35,6 +35,7 @@ export const buildSearch = (kit: SourceAdapterKit, search: FoliumSourceSearch): 
     const searchAlbums = search.searchAlbums?.bind(search);
     const searchPlaylists = search.searchPlaylists?.bind(search);
     return {
+        supportsSongs: search.supportsSongs,
         searchSongs: async (query, limit, offset, context) => toHostPage(
             await kit.run('searchSongs', () => search.searchSongs(query, limit, offset, context?.session ? { session: context.session } : undefined)),
             offset,

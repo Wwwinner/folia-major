@@ -115,7 +115,7 @@ export function activate(folium) {
 | `lyrics@1` | 自己歌的歌词；带 `crossSource` 时也给别的歌、本地歌配歌词 |
 | `auth@1` | 登录与退出（扫码、浏览器、表单） |
 | `library@1` | 登录账号自己的歌单、收藏 |
-| `catalog@1` | 专辑、歌手、歌单与其中的歌 |
+| `catalog@1` | 专辑、歌手、歌单与其中的曲目或专辑 |
 | `recommendations@1` | 每日推荐、私人 FM 等 |
 | `explore@1` | 平台自己的推荐页 |
 | `mutations@1` | 红心、歌单增删、收藏 |
@@ -127,6 +127,7 @@ export function activate(folium) {
 - 宿主不认识的标准能力在模组那一行警告一次、略过；`folium.sources.supports(id, version)` 问这台宿主实现了什么。
 - 自定义能力写成 `x.<模组 id>.<名字>@<版本>`，宿主不读，别的模组经 `folium.omni.capability(sourceId, id)` 取。
 - 每个能力可以声明 `access: 'account'`（只有登录了才能用）；默认是匿名可用。「只用于匹配」只给匿名就能配歌词或信息的音源（第 6 节）。
+- 只含专辑的推荐歌单在 Folium 2.1 可用 `type: 'playlist'` 和 `playlistContents: 'albums'` 声明；宿主用 `catalog@1.getPlaylistAlbums` 替代 `getPlaylistTracks`，点击子专辑才读它的曲目。
 - 同时有几种播放方式的音源要写 `routeOf(song)`：同步、不发请求，答这首歌走 `audio`、`external` 还是 `surface`。没写、答了没实现的方式、
   或者抛错时，按 `capabilities` 里写的先后取第一种。
 - 歌以外的条目（视频之类）在 `itemKinds` 里声明种类和特性（有没有歌词、能不能红心、上不上报），歌用 `kind` 指明。没声明的种类按歌对待：

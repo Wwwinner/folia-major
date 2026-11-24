@@ -121,7 +121,7 @@ interface SearchNavigationState {
      * 结果与在途的搜索一起作废。还在里面就什么都不动（切换当前平台不重置搜索）。
      */
     keepSearchSourceWithin: (sources: readonly SearchSource[], fallback: SearchSource) => boolean;
-    /** `kind` 不给就沿用当前的；来源搜不到这一种时退回单曲（resolveSearchKind）。 */
+    /** `kind` 不给就沿用当前的；来源搜不到这一种时用它支持的第一种（resolveSearchKind）。 */
     submitSearch: (payload: { query?: string; sourceTab: SearchSource; kind?: SearchKind; deps: SearchExecutorDeps; returnView?: SearchReturnView; }) => Promise<boolean>;
     loadMoreSearchResults: (payload: { deps: SearchExecutorDeps; }) => Promise<void>;
 }
@@ -130,17 +130,17 @@ const getSearchCacheKey = (query: string, sourceTab: SearchSource, kind: SearchK
     `${sourceTab}:${kind}:${query.trim().toLowerCase()}`
 );
 
-/** 这个来源能搜的种类：在线平台问 omni，本地与 Navidrome 单曲、专辑、歌单都有。单曲总在第一个。 */
+/** 这个来源能搜的种类：在线平台问 Omni，本地与 Navidrome 有单曲、专辑和歌单。 */
 export const getSearchKinds = (sourceTab: SearchSource): SearchKind[] => {
     if (sourceTab === 'local' || sourceTab === 'navidrome') return ['song', 'album', 'playlist'];
-    const kinds = omni.getProviderSearchKinds(sourceTab);
-    return kinds.includes('song') ? kinds : ['song', ...kinds];
+    return omni.getProviderSearchKinds(sourceTab);
 };
 
-/** 来源搜不到要的那一种（换到了没有专辑搜索的平台）就搜单曲。 */
-export const resolveSearchKind = (sourceTab: SearchSource, kind: SearchKind): SearchKind => (
-    getSearchKinds(sourceTab).includes(kind) ? kind : 'song'
-);
+/** 保留仍然支持的种类，否则用这个来源支持的第一种。 */
+export const resolveSearchKind = (sourceTab: SearchSource, kind: SearchKind): SearchKind => {
+    const kinds = getSearchKinds(sourceTab);
+    return kinds.includes(kind) ? kind : (kinds[0] ?? 'song');
+};
 
 /** No search has picked a source yet: a search then goes to the platform in effect. There is no default platform. */
 export const UNSET_SEARCH_SOURCE: SearchSource = '';

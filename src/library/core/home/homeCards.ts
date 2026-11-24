@@ -3,8 +3,8 @@ import type { ProviderCollection } from '../../../types/onlineMusic';
 import type { LibraryHomeCard, LibraryHomeRadioFeed } from './homeModel.contract';
 
 // src/library/core/home/homeCards.ts
-// 在线首页三个页签的卡片视图模型（纯函数，原样搬自 Grid3D）：账户歌单、收藏专辑、电台（私人 FM、每日推荐、
-// 推荐歌单）。卡片的 raw 是打开集合时交给描述工厂的来源对象，形状与原先一致，所以宿主收到的集合描述不变。
+// 在线首页三个页签的卡片视图模型：账户歌单、收藏专辑、电台（私人 FM、每日推荐、推荐集合）。
+// 卡片的 raw 是打开集合时交给描述工厂的来源对象。
 
 /** 电台页签里的私人 FM 卡：点它直接播放，不打开集合。 */
 export const PERSONAL_FM_CARD_ID = 'personal_fm';
@@ -54,7 +54,10 @@ type RadioSource = {
     id: string | number;
     name: string;
     coverUrl?: string;
+    coverVariants?: ProviderCollection['coverVariants'];
     trackCount?: number;
+    type?: string;
+    playlistContents?: ProviderCollection['playlistContents'];
     description?: string;
     summary?: string;
     isFm?: boolean;
@@ -62,7 +65,7 @@ type RadioSource = {
 };
 
 /**
- * 电台页签：私人 FM、每日推荐排在推荐歌单前面。私人 FM 卡的描述是当前的 FM 模式（provider 支持模式时），
+ * 电台页签：私人 FM、每日推荐排在普通推荐集合前面。私人 FM 卡的描述是当前的 FM 模式（provider 支持模式时），
  * 否则是「私人 FM」。provider 没给 FM 的歌时没有 FM 卡（放不出来的卡不摆出来）。feed 还没读到时为空。
  */
 export const buildOnlineRadioCards = (
@@ -102,14 +105,16 @@ export const buildOnlineRadioCards = (
         id: source.id,
         name: source.name,
         coverUrl: source.coverUrl,
+        ...(source.coverVariants ? { coverVariants: source.coverVariants } : {}),
         trackCount: source.trackCount,
-        description: (source.isFm && source.id === PERSONAL_FM_CARD_ID && personalFmModeLabel) || source.description || t('home.radio'),
+        description: (source.isFm && source.id === PERSONAL_FM_CARD_ID && personalFmModeLabel) || source.description
+            || (source.type === 'album' || source.playlistContents === 'albums' ? '' : t('home.radio')),
         summary: source.summary || '',
         type: source.isFm
             ? 'radio'
             : source.isDailyRecommendations
                 ? 'daily_recommendations'
-                : 'playlist',
+                : source.type ?? 'playlist',
         raw: source,
     }));
 };
@@ -125,7 +130,7 @@ export const isStationCard = (card: Pick<LibraryHomeCard, 'raw'>): boolean => (
     Boolean((card.raw as ProviderCollection | undefined)?.personalFm?.station)
 );
 
-/** 打开在线卡片时交给集合描述工厂的对象：来源对象带上卡片的类型（电台里的推荐歌单记作 playlist）。 */
+/** 打开在线卡片时交给集合描述工厂的对象：带上普通集合或宿主合成卡片的类型。 */
 export const onlineCardCollection = (card: LibraryHomeCard): Record<string, unknown> => (
     card.raw
         ? { ...(card.raw as Record<string, unknown>), type: card.type }

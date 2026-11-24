@@ -67,5 +67,5 @@ getSectionItems?(cursor)     // → { items, moreCursor? }      一栏的后续�
 
 ## 接入新平台时常一起做的两件事（不属于探索页）
 
-- **电台页签**：`recommendations` 成员（`getPersonalFm`、`getDailySongs`、`getRecommendedCollections`、`dislikeSong`）加 `capabilities.recommendations`。平台没有对应内容的卡片就不出，不拿别的东西充数。
+- **「推荐」页签（代码里叫电台）**：由 `recommendations@1` 提供实际支持的 `getPersonalFm`、`getDailySongs` 或 `getRecommendedCollections`。平台没有对应内容就不出卡片，不拿别的东西充数。普通推荐集合按实际类型打开，例如推荐专辑走专辑目录。已配置、无需登录的音源可以提供公开推荐，但不因此开放账号曲库。
 - **音质档位**：`playback.audioQualityLevels` 列出平台真正分得开的档位，控制面板只显示这些。

@@ -89,14 +89,13 @@ describe('the copies of what foliumShared.json holds', () => {
 });
 
 describe('the permissions in foliumShared.json', () => {
-    // Each permission lists the members it unlocks: `folium.*` on the client, `api.*` in the main entry.
-    it('each name the members they guard, and no member is guarded twice', () => {
-        const guarded = Object.entries(shared.permissions).flatMap(([id, permission]) => {
-            expect(permission.guards.length, id).toBeGreaterThan(0);
-            return permission.guards;
-        });
-        guarded.forEach((member) => expect(member).toMatch(/^(folium|api)\.[A-Za-z]+(\.[A-Za-z]+)*$/));
-        expect(new Set(guarded).size).toBe(guarded.length);
+    // Each permission lists the members it guards; an operation may require more than one permission.
+    it('lists valid, distinct members for each permission', () => {
+        for (const [id, { guards }] of Object.entries(shared.permissions)) {
+            expect(guards.length, id).toBeGreaterThan(0);
+            expect(new Set(guards).size, id).toBe(guards.length);
+            for (const member of guards) expect(member).toMatch(/^(folium|api)\.[A-Za-z]+(\.[A-Za-z]+)*$/);
+        }
     });
 
     // The registries' gate and `folium:check` read a registry's permission from the kinds table; the

@@ -457,7 +457,7 @@ export function useAppNavigation() {
         returnView?: SearchReturnView;
     }) => {
         useCollectionNavigationStore.getState().clear();
-        // 搜索先提交、再压历史：种类按提交时定下的记（来源搜不到的种类已退回单曲）。
+        // 搜索先提交、再压历史：记实际搜索的种类，不记调用方请求的种类。
         const search = { query, sourceTab, kind: useSearchNavigationStore.getState().searchKind, returnView };
         pushNavigationState({
             view: 'home',

@@ -90,16 +90,16 @@ export type LibraryHomeLocalAvailability = {
     reason: 'insecure-http' | 'file-system-api-unavailable' | null;
 };
 
-/** 在线首页数据的归属：哪个 provider 的哪个账户。换了归属，旧数据与还在路上的应答都作废。 */
-export type LibraryHomeFeedOwner = {
+/** 在线首页数据的归属：哪个 provider 的账户；公开推荐的 userId 为 null。 */
+export type LibraryHomeFeedOwner<TUserId extends MediaId | null = MediaId> = {
     providerId: string;
-    userId: MediaId;
+    userId: TUserId;
 };
 
 export type LibraryHomeFeedStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-export type LibraryHomeFeedSnapshot<TData> = {
-    owner: LibraryHomeFeedOwner | null;
+export type LibraryHomeFeedSnapshot<TData, TUserId extends MediaId | null = MediaId> = {
+    owner: LibraryHomeFeedOwner<TUserId> | null;
     status: LibraryHomeFeedStatus;
     /** 这个归属下至少成功读到过一次（ensure 据此决定要不要读）。 */
     loaded: boolean;
@@ -110,11 +110,11 @@ export type LibraryHomeFeedSnapshot<TData> = {
  * 一份在线首页数据（收藏专辑、电台 feed）。实现在 core/home/online/onlineHomeFeeds.service：每次读取领一个 generation，
  * 换归属或重新读取都会让旧的读取作废——晚到的应答直接丢掉，不会落进新 provider / 新账户的列表。
  */
-export interface LibraryHomeFeedResource<TData> {
-    getSnapshot(): LibraryHomeFeedSnapshot<TData>;
+export interface LibraryHomeFeedResource<TData, TUserId extends MediaId | null = MediaId> {
+    getSnapshot(): LibraryHomeFeedSnapshot<TData, TUserId>;
     subscribe(listener: () => void): () => void;
-    /** 换归属（null：没有账户或 provider 不支持）：清空数据、作废进行中的读取。同一归属重复设置不起作用。 */
-    setOwner(owner: LibraryHomeFeedOwner | null): void;
+    /** 清空或切换归属时作废进行中的读取，同一归属重复设置不起作用。 */
+    setOwner(owner: LibraryHomeFeedOwner<TUserId> | null): void;
     /** 这个归属下还没读到过就读一次；正在读或已读到时什么都不做。 */
     ensure(): Promise<void>;
     /** 不管读没读过都重新读（旧数据保留到新数据到达）；没有归属时什么都不做。 */
@@ -143,7 +143,7 @@ export type LibraryHomeRadioFeed = {
  */
 export type LibraryHomeResources = {
     favoriteAlbums: LibraryHomeFeedResource<ProviderCollection[]>;
-    radioFeed: LibraryHomeFeedResource<LibraryHomeRadioFeed | null>;
+    radioFeed: LibraryHomeFeedResource<LibraryHomeRadioFeed | null, MediaId | null>;
     actions: LibraryHomeActionsController;
     /** Navidrome 页签的概览（进页签时 ensure；离开页签或首页时作废，下次进来重读）。 */
     navidromeOverview: LibraryNavidromeHomeResource;
@@ -160,6 +160,7 @@ export type LibraryHomeCard = {
     name: string;
     type?: string;
     coverUrl?: string;
+    coverVariants?: ProviderCollection['coverVariants'];
     description?: string;
     summary?: string;
     trackCount?: number;

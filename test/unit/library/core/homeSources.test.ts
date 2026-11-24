@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
 import type { OmniProviderCapabilities, ProviderAccountSummary, ProviderCollection } from '@/types/onlineMusic';
 import {
+    canBrowsePublicRadio,
     cycleIndex,
     homeGroupOfTab,
     homeScanPercent,
@@ -13,6 +14,7 @@ import {
     resolveHomeTabs,
     resolveLocalUnavailableReason,
     resolveOnlineHomeLoading,
+    resolveOnlineHomeTab,
     resolveOnlineTabUnavailableReason,
     translateHomeMessage,
     translateHomeTabs,
@@ -88,6 +90,24 @@ describe('resolveHomeOnlineSource', () => {
         expect(source({ provider: summary({ status: 'anonymous' }), platformAvailable: true }).accountView).toBe('guest');
         expect(source({ provider: summary({ requiresAccount: false } as Partial<ProviderAccountSummary>) }).accountView).toBe('accountless');
         expect(source({ provider: summary({ error: 'auth-required' } as Partial<ProviderAccountSummary>) }).needsRelogin).toBe(true);
+    });
+
+    it('only routes to public recommendations for a configured accountless source', () => {
+        const configured = source({
+            provider: summary({ requiresAccount: false, availability: { configured: true } }),
+            capabilities: { ...NONE, recommendations: true },
+        });
+        expect(canBrowsePublicRadio(configured)).toBe(true);
+        expect(resolveOnlineHomeTab('playlist', configured, true)).toBe('radio');
+        expect(resolveOnlineHomeTab('explore', configured, true)).toBe('radio');
+        expect(resolveOnlineHomeTab('local', configured, true)).toBe('local');
+        expect(resolveOnlineHomeTab('playlist', configured, false)).toBe('playlist');
+
+        const unconfigured = source({ provider: summary({ requiresAccount: false, availability: { configured: false } }) });
+        const guest = source({ provider: summary({ status: 'anonymous', availability: { configured: true } }) });
+        expect(canBrowsePublicRadio(unconfigured)).toBe(false);
+        expect(canBrowsePublicRadio(guest)).toBe(false);
+        expect(resolveOnlineHomeTab('playlist', unconfigured, true)).toBe('playlist');
     });
 });
 

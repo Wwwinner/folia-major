@@ -71,7 +71,7 @@ describe('an empty or missing built-in folder (gate 2)', () => {
         const { states, sources } = system.listSourceStates();
         expect(Object.values(states).every((state) => state === 'enabled')).toBe(true);
         expect(sources.map((source) => source.sourceId)).toEqual(
-            ['netease', 'kugou', 'qq', 'bodian', 'qishui', 'ytm', 'spotify', 'appleMusic', 'fnmusic', 'lxmusic'],
+            ['netease', 'kugou', 'qq', 'bodian', 'qishui', 'ytm', 'spotify', 'appleMusic', 'fnmusic', 'lxmusic', 'fanjiao'],
         );
         expect(sources.every((source) => source.modId === null)).toBe(true);
     });

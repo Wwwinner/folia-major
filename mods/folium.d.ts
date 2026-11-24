@@ -16,7 +16,7 @@
 // 里面的每个文件都算模组的内容），路径改成拷过去的位置。这个文件只给编辑器看，宿主不读它。
 
 /** The Folium version this host implements; mods read it at runtime as `folium.host.folium`. */
-export declare const FOLIUM_VERSION: { readonly major: 2; readonly minor: 0 };
+export declare const FOLIUM_VERSION: { readonly major: 2; readonly minor: 1 };
 
 /** `modid:name`, like a Forge ResourceLocation. The mod id part is added by the host. */
 export type FoliumId = string;
@@ -1354,6 +1354,16 @@ export interface FoliumPlaybackService {
     previous(): void;
     /** Plays a song by its host `ref`. Resolves false when the ref is unknown. Needs `playback.control`. */
     playSong(song: FoliumSong): Promise<boolean>;
+    /**
+     * Folium 2.1: starts the song in the given ordered queue as if the user
+     * chose it from a collection. Check `folium.host.folium.minor >= 1` on a Folium 2 host.
+     * The song must be in `queue`. The queue version is checked before
+     * playback starts; a cancelled start leaves the old queue in place. `startAtSec` applies to
+     * local, Navidrome, and external players. False for stale refs, stale versions, or Stage playback
+     * with a supplied queue; true means the request reached the player, not that media played.
+     * Needs `playback.control` and `playback.queue`.
+     */
+    playSongWithQueue(song: FoliumSong, options: { queue: readonly FoliumSong[]; expectedVersion: string; startAtSec?: number }): Promise<boolean>;
     /**
      * Adds a song (by `ref`) to the queue the way the user's queue-add setting says (next or last), as the
      * host's own add does: a song already queued moves there; the song playing now, and a song its source
@@ -3385,12 +3395,16 @@ export interface FoliumSourceCollection {
     name: string;
     /** Its cover. */
     coverUrl?: string;
+    /** Folium 2.1: optional, separately composed covers for wide, tall, and square slots. `coverUrl` remains the default. */
+    coverVariants?: Readonly<{ landscape?: string; portrait?: string; square?: string }>;
     /** The source's description. */
     description?: string;
     /** Songs in it. */
     trackCount?: number;
     /** An artist's albums. */
     albumCount?: number;
+    /** Folium 2.1: a playlist of albums, opened through `catalog@1.getPlaylistAlbums` rather than `getPlaylistTracks`. */
+    playlistContents?: 'albums';
     /** The account made it. */
     isOwned?: boolean;
     /** Who made it. */
@@ -3432,6 +3446,8 @@ export type FoliumSourceAccess = 'anonymous' | 'account';
 export interface FoliumSourceSearch {
     /** Whether searching needs an account; read when the host builds its search sources. May be a getter. */
     readonly access?: FoliumSourceAccess;
+    /** Folium 2.1: set to `false` for collection-only search. The search page and Omni skip `searchSongs`. */
+    readonly supportsSongs?: false;
     /** Songs for `query`, `limit` from `offset`. */
     searchSongs(query: string, limit: number, offset: number, context?: FoliumSourceSearchContext): Promise<FoliumSourcePage<FoliumSourceSong>>;
     /** Albums (`type: 'album'`); left out where the source has no album search. */
@@ -3992,6 +4008,8 @@ export interface FoliumSourceCatalog {
     resolveSongCatalogRefs?(song: FoliumSourceSong): Promise<FoliumSourceSong>;
     /** A playlist's songs. */
     getPlaylistTracks?(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceSong>>;
+    /** Folium 2.1: the albums in a playlist with `playlistContents: 'albums'`, in the source's order. */
+    getPlaylistAlbums?(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceCollection>>;
     /** A playlist's details. */
     getPlaylistDetail?(id: string, collection?: FoliumSourceCollection): Promise<FoliumSourceCollection | null>;
     /** The cloud songs. */

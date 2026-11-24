@@ -88,3 +88,25 @@ describe('omni collection search', () => {
         expect(searchAlbums).not.toHaveBeenCalled();
     });
 });
+
+it('routes a playlist of albums to its own catalog without treating the albums as tracks', async () => {
+    const album = collection(providerId, 'a1', 'album');
+    const playlist: ProviderCollection = { ...collection(providerId, 'p1', 'playlist'), playlistContents: 'albums' };
+    const musicPlaylist = collection(providerId, 'p2', 'playlist');
+    const getPlaylistTracks = vi.fn(noSongs);
+    registerOnlineMusicProvider({
+        ...provider(undefined),
+        catalog: {
+            getPlaylistTracks,
+            async getPlaylistAlbums() {
+                return { items: [album, collection('another-provider', 'a2', 'album'), musicPlaylist], hasMore: true, nextOffset: 30 };
+            },
+        },
+    });
+
+    const page = { limit: 10, offset: 20 };
+    await expect(omni.getPlaylistAlbums(playlist, page)).resolves.toEqual({ items: [album], hasMore: true, nextOffset: 30 });
+    await expect(omni.getCollectionTracks(playlist, page)).resolves.toEqual({ items: [], hasMore: false, nextOffset: 20 });
+    await omni.getCollectionTracks(musicPlaylist, page);
+    expect(getPlaylistTracks.mock.calls).toEqual([['p2', 10, 20, musicPlaylist]]);
+});

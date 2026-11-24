@@ -39,6 +39,8 @@ Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，
 
 如果希望能够在移动设备上使用，或在浏览器上体验，可以选择[一键部署到 Vercel](https://folia-site.cielaniska.top/guide/deploy-vercel) 的 Web 版本，或自行部署到其他支持 Node.js 的平台。
 
+桌面版可在「设置 → 音源」启用[饭角](sources/fanjiao/README.md)。配置本机签名凭据后，在平台切换器选饭角，可从原生「推荐」浏览广播剧，也可搜剧、播放分集和查看字幕。
+
 ## 快速下载
 
 > [!TIP]

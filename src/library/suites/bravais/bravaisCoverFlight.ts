@@ -5,6 +5,7 @@ import { getCoverIdentity, getSizedCoverUrl } from '../../../utils/coverUrl';
 // 封面自己的角度）；从这张专辑返回时，海报上的封面飞回墙上原来那一格。
 // - 飞的是一张盖在最上面的 fixed 图（document.body 里），不碰墙与海报的 DOM 结构；去程时海报自己的封面先藏着，落地才露出来。
 // - 一段到底：飞行的图在路上就变成海报封面的样子（同一张图，墨色硬阴影跟着长出来），落地同一帧换成海报自己的封面。
+// - 磁贴用独立构图时仍飞实际显示的图，靠专辑默认封面认同一张专辑，落地再淡切到海报封面。
 // - 两头都可能在动（相机补间、缝张开、倾斜），所以每帧重新量终点（measureQuad：在元素的三个角放零尺寸探针，读出屏幕上的
 //   角点，倾斜与缩放都算在内），起点是出发那一刻量好的。
 // - 去程的起点在点磁贴时记下（noteCoverFlightSource），海报挂载时取走（1.5s 内、封面相同才算）；回程按记下的 slot 找墙上
@@ -279,14 +280,14 @@ const tileCoverQuad = (tile: HTMLElement): BravaisQuad | null => {
 
 // ---- 去程：点专辑磁贴 → 专辑海报 ----
 
-type Source = { cardKey: string; slotKey: string; coverUrl: string; quad: BravaisQuad; at: number };
+type Source = { cardKey: string; slotKey: string; coverUrl: string; albumCoverIdentity: string; quad: BravaisQuad; at: number };
 let source: Source | null = null;
 
 /** 点了一张专辑磁贴：记下它此刻的样子（真正打开专辑时海报来取）。 */
-export const noteCoverFlightSource = (tile: Element, cardKey: string, slotKey: string, coverUrl: string | undefined) => {
-    if (!coverUrl) return;
+export const noteCoverFlightSource = (tile: Element, cardKey: string, slotKey: string, coverUrl: string | undefined, albumCoverUrl: string | undefined) => {
+    if (!coverUrl || !albumCoverUrl) return;
     const quad = tile instanceof HTMLElement ? tileCoverQuad(tile) : measureQuad(tile);
-    source = quad ? { cardKey, slotKey, coverUrl, quad, at: performance.now() } : null;
+    source = quad ? { cardKey, slotKey, coverUrl, albumCoverIdentity: getCoverIdentity(albumCoverUrl), quad, at: performance.now() } : null;
 };
 
 /** 专辑海报挂载：封面相同、刚点过的，取走它。 */
@@ -295,7 +296,7 @@ export const takeCoverFlightSource = (coverUrl: string | undefined): Source | nu
     source = null;
     if (!taken || !coverUrl || reducedMotion()) return null;
     if (performance.now() - taken.at > SOURCE_TTL_MS) return null;
-    return getCoverIdentity(taken.coverUrl) === getCoverIdentity(coverUrl) ? taken : null;
+    return taken.albumCoverIdentity === getCoverIdentity(coverUrl) ? taken : null;
 };
 
 /** 从起点飞到海报上的封面（每帧量它）；落地时 onLand 同步让海报露出自己的封面。 */
@@ -305,7 +306,7 @@ export const flyCoverToPoster = (from: Source, cover: HTMLElement, onLand: () =>
     target: () => measureQuad(cover),
     duration: FLIGHT_MS,
     shadow: { from: NO_SHADOW, to: quad => readCoverShadow(cover, quad) },
-    landing: 'swap',
+    landing: getCoverIdentity(from.coverUrl) === from.albumCoverIdentity ? 'swap' : 'fade',
     lost: () => !cover.isConnected,
     ready: () => {
         const image = cover.querySelector('img');

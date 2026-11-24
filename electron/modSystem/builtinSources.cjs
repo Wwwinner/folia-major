@@ -115,6 +115,13 @@ const BUILTIN_SOURCE_TABLE = Object.freeze({
         userDataDirs: [],
         native: [],
     }),
+    fanjiao: Object.freeze({
+        sources: ['fanjiao'],
+        storeKeys: [],
+        partitions: [],
+        userDataDirs: [],
+        native: [],
+    }),
 });
 
 /** Every short source id the table knows, in the table's order. */

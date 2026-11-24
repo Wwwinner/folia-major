@@ -189,13 +189,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         providerId: activeProviderId,
         localRow: localMusicState.activeRow,
     });
-    // 在线列表只在账户已就绪时显示（无账户 / 解析中 / 未登录各有面板）。探索页签没有卡片列表：它是平台自己的推荐页。
-    const showOnlineList = isOnlineTab
-        && !noOnlineSources
-        && homeViewTab !== 'explore'
-        && activeAccountView !== 'accountless'
-        && activeAccountView !== 'resolving'
-        && activeAccountView !== 'guest';
+    const showOnlineList = !noOnlineSources && onlineList.showList;
     // On the explore tab the wall (队列拼贴) shows the page's entries, not the play queue: it is
     // offered there once the page has an entry to show, with or without a song on the player.
     const opensExploreWall = homeViewTab === 'explore' && online.canUseExplore;
@@ -381,12 +375,12 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         ...(props.extraTabs ?? []).map(tab => ({ ...tab, enabled: true })),
     ];
     // 一级那一排：点一个组去它记住的那一页（在线组是上次停的那一页）。
-    const selectHomeTab = (tab: LibraryHomeTabKey) => {
-        setHomeViewTab(tab);
+    const selectHomeTab = (tab: LibraryHomeTabKey, fromGroup = false) => {
+        setHomeViewTab(tab, fromGroup);
         focusActiveSlider();
     };
     const selectHomeGroup = (group: LibraryHomeGroupView) => {
-        if (group.target) selectHomeTab(group.target);
+        if (group.target) selectHomeTab(group.target, true);
     };
     // 「设置 → 音源」只在桌面版有。
     const openSourceSettings = window.electron ? () => openSettings('options', 'sources', null, 'sourceList') : undefined;
@@ -857,7 +851,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                         isDaylight={isDaylight}
                         action={openSourceSettings ? { label: t('home.noSourcesAction'), icon: Cable, run: openSourceSettings } : undefined}
                     />
-                ) : isOnlineTab && activeAccountView === 'accountless' ? (
+                ) : isOnlineTab && activeAccountView === 'accountless' && !showOnlineList ? (
                     <OnlineProviderAccountlessPanel
                         providerLabel={activeProviderLabel}
                         isDaylight={isDaylight}

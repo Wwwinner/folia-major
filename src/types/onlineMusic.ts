@@ -237,9 +237,12 @@ export interface ProviderCollection {
      */
     type: 'playlist' | 'album' | 'artist' | 'radio' | 'cloud' | 'listening_rank' | 'artist_songs' | string;
     coverUrl?: string;
+    coverVariants?: Readonly<{ landscape?: string; portrait?: string; square?: string }>;
     description?: string;
     trackCount?: number;
     albumCount?: number;
+    /** A playlist whose entries are albums, not tracks. */
+    playlistContents?: 'albums';
     isOwned?: boolean;
     creator?: ProviderUser;
     artists?: ProviderArtistSummary[];
@@ -376,6 +379,8 @@ export interface ProviderSearchContext {
 export type ProviderSearchKind = 'song' | 'album' | 'playlist';
 
 export interface OnlineSearchProvider {
+    /** False when the provider searches collections but not individual tracks. */
+    readonly supportsSongs?: false;
     /**
      * A provider that keeps what it read of a search between its pages keeps it apart for each
      * `context.session`; one that keeps nothing between pages ignores the context.
@@ -914,6 +919,7 @@ export interface OnlineCatalogProvider {
     canResolveSongCatalogRefs?(song: UnifiedSong): boolean;
     resolveSongCatalogRefs?(song: UnifiedSong): Promise<UnifiedSong>;
     getPlaylistTracks?(id: MediaId, limit: number, offset: number, collection?: ProviderCollection): Promise<ProviderPage<UnifiedSong>>;
+    getPlaylistAlbums?(id: MediaId, limit: number, offset: number, collection?: ProviderCollection): Promise<ProviderPage<ProviderCollection>>;
     getPlaylistDetail?(id: MediaId, collection?: ProviderCollection): Promise<ProviderCollection | null>;
     getCloudTracks?(limit: number, offset: number, collection?: ProviderCollection): Promise<ProviderPage<UnifiedSong>>;
     /** The ranking's songs in the platform's order, each with the `listenCount` it gives where it gives one. */

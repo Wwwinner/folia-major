@@ -2,7 +2,7 @@
 
 # Folium API 参考
 
-当前契约版本：**Folium 2.0**。
+当前契约版本：**Folium 2.1**。
 
 本文列出模组能用到的全部公开类型，内容直接来自契约文件 [`src/mods/folium/contract.ts`](../../src/mods/folium/contract.ts)
 （client 入口）、[`src/mods/folium/sources/contract.ts`](../../src/mods/folium/sources/contract.ts)（音源）与 [`src/mods/folium/mainContract.ts`](../../src/mods/folium/mainContract.ts)（main 入口），
@@ -39,8 +39,8 @@
 | --- | --- |
 | `filesystem.data` | `folium.storage`、`api.storage` |
 | `playback.read` | `api.runtime.getPlaybackSnapshot` |
-| `playback.control` | `folium.playback.play`、`folium.playback.pause`、`folium.playback.toggle`、`folium.playback.seek`、`folium.playback.seekToLyricTime`、`folium.playback.next`、`folium.playback.previous`、`folium.playback.playSong`、`folium.playback.enqueue`、`folium.playback.shuffleQueue`、`folium.playback.toggleLike`、`folium.playback.setVolume`、`folium.playback.setMuted`、`folium.playback.setLoopMode`、`folium.playback.playQueueItem` |
-| `playback.queue` | `folium.playback.replaceQueue` |
+| `playback.control` | `folium.playback.play`、`folium.playback.pause`、`folium.playback.toggle`、`folium.playback.seek`、`folium.playback.seekToLyricTime`、`folium.playback.next`、`folium.playback.previous`、`folium.playback.playSong`、`folium.playback.enqueue`、`folium.playback.shuffleQueue`、`folium.playback.toggleLike`、`folium.playback.setVolume`、`folium.playback.setMuted`、`folium.playback.setLoopMode`、`folium.playback.playQueueItem`、`folium.playback.playSongWithQueue` |
+| `playback.queue` | `folium.playback.replaceQueue`、`folium.playback.playSongWithQueue` |
 | `equalizer.control` | `folium.equalizer.setMode`、`folium.equalizer.applyCurve`、`folium.equalizer.releaseCurve` |
 | `visualizer.renderQuality` | `folium.visualizer.setRenderQuality` |
 | `visualizer.mode` | `folium.visualizer.setMode` |
@@ -917,6 +917,7 @@ which needs `playback.queue`. All of it is unavailable in the export window.
 | `next()` | `(): void` | Next track. Needs `playback.control`. |
 | `previous()` | `(): void` | Previous track. Needs `playback.control`. |
 | `playSong()` | `(song: FoliumSong): Promise<boolean>` | Plays a song by its host `ref`. Resolves false when the ref is unknown. Needs `playback.control`. |
+| `playSongWithQueue()` | `(song: FoliumSong, options: { queue: readonly FoliumSong[]; expectedVersion: string; startAtSec?: number }): Promise<boolean>` | Folium 2.1: starts the song in the given ordered queue as if the user chose it from a collection. Check `folium.host.folium.minor >= 1` on a Folium 2 host. The song must be in `queue`. The queue version is checked before playback starts; a cancelled start leaves the old queue in place. `startAtSec` applies to local, Navidrome, and external players. False for stale refs, stale versions, or Stage playback with a supplied queue; true means the request reached the player, not that media played. Needs `playback.control` and `playback.queue`. |
 | `enqueue()` | `(song: FoliumSong): boolean` | Adds a song (by `ref`) to the queue the way the user's queue-add setting says (next or last), as the host's own add does: a song already queued moves there; the song playing now, and a song its source marks unavailable, are not added; the host shows its own notice. False when the ref is unknown; true otherwise, also when the queue did not change. Needs `playback.control`. |
 | `shuffleQueue()` | `(): boolean` | Shuffles the play queue, keeping the current song first. False when there is nothing to shuffle (Personal FM, a queue of one, external Stage playback). Needs `playback.control`. |
 | `toggleLike()` | `(): boolean` | Likes or unlikes the displayed song, like the host's like button, which also reports the result. False when `canLike` is false. Needs `playback.control`. |
@@ -2695,9 +2696,11 @@ Folium 2: a playlist, an album, an artist, or a list the source makes (`radio`, 
 | `type` | `'playlist' \| 'album' \| 'artist' \| 'radio' \| 'cloud' \| 'listening_rank' \| 'artist_songs' \| (string & {})` | What it is. |
 | `name` | `string` | Its name. |
 | `coverUrl?` | `string` | Its cover. |
+| `coverVariants?` | `Readonly<{ landscape?: string; portrait?: string; square?: string }>` | Folium 2.1: optional, separately composed covers for wide, tall, and square slots. `coverUrl` remains the default. |
 | `description?` | `string` | The source's description. |
 | `trackCount?` | `number` | Songs in it. |
 | `albumCount?` | `number` | An artist's albums. |
+| `playlistContents?` | `'albums'` | Folium 2.1: a playlist of albums, opened through `catalog@1.getPlaylistAlbums` rather than `getPlaylistTracks`. |
 | `isOwned?` | `boolean` | The account made it. |
 | `creator?` | `FoliumSourceUser` | Who made it. |
 | `artists?` | `FoliumSourceNamedRef[]` | An album's artists. |
@@ -2737,6 +2740,7 @@ Folium 2: `search@1`.
 | 成员 | 类型 | 说明 |
 | --- | --- | --- |
 | `readonly access?` | `FoliumSourceAccess` | Whether searching needs an account; read when the host builds its search sources. May be a getter. |
+| `readonly supportsSongs?` | `false` | Folium 2.1: set to `false` for collection-only search. The search page and Omni skip `searchSongs`. |
 | `searchSongs()` | `(query: string, limit: number, offset: number, context?: FoliumSourceSearchContext): Promise<FoliumSourcePage<FoliumSourceSong>>` | Songs for `query`, `limit` from `offset`. |
 | `searchAlbums?()` | `(query: string, limit: number, offset: number): Promise<FoliumSourcePage<FoliumSourceCollection>>` | Albums (`type: 'album'`); left out where the source has no album search. |
 | `searchPlaylists?()` | `(query: string, limit: number, offset: number): Promise<FoliumSourcePage<FoliumSourceCollection>>` | Playlists (`type: 'playlist'`); left out where the source has no playlist search. |
@@ -3240,6 +3244,7 @@ Folium 2: `catalog@1`. `collection` is the entry as the host has it, where it ha
 | `canResolveSongCatalogRefs?()` | `(song: FoliumSourceSong): boolean` | Whether `resolveSongCatalogRefs` can fill in where `song`'s album and artists open. Synchronous. |
 | `resolveSongCatalogRefs?()` | `(song: FoliumSourceSong): Promise<FoliumSourceSong>` | `song` with its album's and artists' ids filled in. |
 | `getPlaylistTracks?()` | `(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceSong>>` | A playlist's songs. |
+| `getPlaylistAlbums?()` | `(id: string, limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceCollection>>` | Folium 2.1: the albums in a playlist with `playlistContents: 'albums'`, in the source's order. |
 | `getPlaylistDetail?()` | `(id: string, collection?: FoliumSourceCollection): Promise<FoliumSourceCollection \| null>` | A playlist's details. |
 | `getCloudTracks?()` | `(limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceSong>>` | The cloud songs. |
 | `getListeningRankTracks?()` | `(range: 'week' \| 'all', limit: number, offset: number, collection?: FoliumSourceCollection): Promise<FoliumSourcePage<FoliumSourceSong>>` | The ranking's songs, each with `row.listenCount` where the source gives one. |
@@ -4096,7 +4101,7 @@ Folium 2: `api.windows` of a source mod.
 The Folium version this host implements; mods read it at runtime as `folium.host.folium`.
 
 ```ts
-const FOLIUM_VERSION = Object.freeze({ major: 2, minor: 0 })
+const FOLIUM_VERSION = Object.freeze({ major: 2, minor: 1 })
 ```
 
 ### FoliumId

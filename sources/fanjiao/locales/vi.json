@@ -1,0 +1,9 @@
+{
+    "sourceName": "Fanjiao",
+    "notConfigured": "Thiếu thông tin xác thực chữ ký Fanjiao. Đặt FANJIAO_SIGNATURE_SECRET_FILE rồi khởi động lại Folia.",
+    "notPlayable": "Tập này hiện chưa phát được.",
+    "requestFailed": "Yêu cầu thất bại. Hãy thử lại sau.",
+    "playbackFailed": "Phát thất bại. Hãy thử lại sau.",
+    "unsupportedPlayback": "Môi trường này không hỗ trợ cách phát này.",
+    "nothingToContinue": "Chưa có tập Fanjiao nào để nghe tiếp."
+}

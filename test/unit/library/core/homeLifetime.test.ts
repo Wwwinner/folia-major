@@ -46,7 +46,7 @@ const createResources = () => {
 };
 
 const songs = [{ id: '1' }] as LocalSong[];
-const ATTACH = { providerId: 'p', userId: 'u1', canUseAlbums: true, canUseRadio: true } as const;
+const ATTACH = { providerId: 'p', userId: 'u1', canUseAlbums: true, canUseRadio: true, canBrowsePublicRadio: false } as const;
 
 /** 一个首页 surface 挂载时做的事（任何 suite 都一样）：认领在线数据、ensure 当前页签的数据。 */
 const mountSurface = (resources: LibraryHomeResources, tab: 'albums' | 'radio') => {
@@ -71,6 +71,23 @@ describe('home resources across suites', () => {
         expect(getHomeFeed).not.toHaveBeenCalled();
         expect(navidromeAlbums).toHaveBeenCalledTimes(navidromeCalls);
         expect(loadTrees).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads public recommendations without claiming an account library', async () => {
+        const { resources, getHomeFeed, getUserAlbums } = createResources();
+        const publicSource = { ...ATTACH, providerId: 'public', userId: null, canBrowsePublicRadio: true };
+        attachOnlineHomeFeeds(resources, { ...publicSource, tab: 'radio' });
+        await flush();
+        expect(resources.radioFeed.getSnapshot()).toMatchObject({ owner: { providerId: 'public', userId: null }, loaded: true });
+
+        attachOnlineHomeFeeds(resources, { ...publicSource, tab: 'albums' });
+        expect(resources.favoriteAlbums.getSnapshot().owner).toBeNull();
+        expect(getUserAlbums).not.toHaveBeenCalled();
+        expect(getHomeFeed).toHaveBeenCalledTimes(1);
+
+        attachOnlineHomeFeeds(resources, { ...publicSource, canBrowsePublicRadio: false, tab: 'radio' });
+        expect(resources.radioFeed.getSnapshot()).toMatchObject({ owner: null, data: null });
+        expect(getHomeFeed).toHaveBeenCalledTimes(1);
     });
 
     it('leaving the home releases everything: coming back reads again', async () => {

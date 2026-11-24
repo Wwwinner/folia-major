@@ -32,7 +32,7 @@ type SearchWorkspaceProps = {
     theme: Theme;
     isDaylight: boolean;
     onClose: () => void;
-    onSubmitSearch: (source?: SearchSource, kind?: SearchKind) => void;
+    onSubmitSearch: (source?: SearchSource, kind?: SearchKind, query?: string) => void;
     onLoadMore: () => void;
     onPlayTrack: (track: UnifiedSong) => void;
     onAddTrackToQueue: (track: UnifiedSong) => void;
@@ -112,7 +112,7 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
     const isCollectionKind = searchKind !== 'song';
     const resultCount = isCollectionKind ? collections.length : results.length;
     const { sources, activeProviderId } = useSearchSources(hasLocalSongs);
-    const kinds = useMemo(() => getSearchKinds(searchSourceTab), [searchSourceTab]);
+    const kinds = useMemo(() => sources.includes(searchSourceTab) ? getSearchKinds(searchSourceTab) : [], [sources, searchSourceTab]);
     const hasCollection = useCollectionNavigationStore(state => Boolean(state.snapshot?.stack.length));
     const getSourceLabel = useSearchSourceLabel();
     const collectTrack = useCallback((track: UnifiedSong) => {
@@ -133,8 +133,15 @@ const SearchWorkspace: React.FC<SearchWorkspaceProps> = ({
         // The current platform, or the first source listed where the current one has no search.
         const fallback = sources.includes(activeProviderId) ? activeProviderId : (sources[0] ?? activeProviderId);
         const fellBack = useSearchNavigationStore.getState().keepSearchSourceWithin(sources, fallback);
-        if (fellBack && submittedQuery.trim()) onSubmitSearch(fallback);
-    }, [activeProviderId, isSearchOpen, onSubmitSearch, sources, submittedQuery]);
+        if (!submittedQuery.trim()) return;
+        if (fellBack) {
+            onSubmitSearch(fallback);
+            return;
+        }
+        if (!hasCollection && kinds.length && !kinds.includes(searchKind)) {
+            onSubmitSearch(searchSourceTab, kinds[0], submittedQuery);
+        }
+    }, [activeProviderId, hasCollection, isSearchOpen, kinds, onSubmitSearch, searchKind, searchSourceTab, sources, submittedQuery]);
 
     useEffect(() => {
         if (!isSearchOpen || hasCollection) return;

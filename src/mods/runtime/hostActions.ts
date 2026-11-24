@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { SongResult } from '@/types';
+import type { PlaybackNavigationOptions } from '@/types/appPlayback';
 import { PlayerState } from '@/types';
 import {
     usePlaybackStore,
@@ -7,6 +8,7 @@ import {
     selectDisplayLyrics,
     selectDisplayPlayerState,
     selectDisplaySong,
+    selectIsShowingTail,
 } from '@/stores/usePlaybackStore';
 import { useAppViewStore } from '@/stores/useAppViewStore';
 import { useAudioSettingsStore } from '@/stores/useAudioSettingsStore';
@@ -14,8 +16,9 @@ import { setStatusMessage } from '@/stores/useStatusMessageStore';
 import { currentTime } from '@/stores/motionSignals';
 import type { PanelTab } from '@/components/UnifiedPanel';
 import { clampMediaVolume } from '@/utils/appPlaybackHelpers';
+import { isStagePlaybackSong } from '@/utils/appPlaybackGuards';
 import { resolveLikeAvailability } from '@/utils/playerLikeAvailability';
-import { buildFoliumQueueSnapshot, resolveFoliumQueuePlayRequest } from './hostQueue';
+import { buildFoliumQueueSnapshot, resolveFoliumQueueKind, resolveFoliumQueuePlayRequest } from './hostQueue';
 import { canShuffleQueue } from '@/utils/playbackNeighbors';
 import { rerunLyricsTransform } from '@/services/hostExtensionHooks';
 import { resolveFoliumSongRef, toFoliumLines, toFoliumSong } from '../folium/dto';
@@ -24,6 +27,7 @@ import { registerFoliumHostActions } from '../folium/services';
 import { stepFoliumHostBack } from './hostBack';
 import { showRefreshedLyrics } from './hostEvents';
 import { registerFoliumQueueWriter, replaceFoliumQueue } from './queue/hostQueueReplace';
+import { readFoliumQueueVersion } from './queue/queueVersion';
 
 // src/mods/runtime/hostActions.ts
 // App registers the real host actions behind folium.playback / folium.ui here.
@@ -38,7 +42,7 @@ export interface FoliumAppActions {
     seekToLyricTime: (lyricSeconds: number) => void;
     next: () => void;
     previous: () => void;
-    playSong: (song: SongResult) => void | Promise<void>;
+    playSong: (song: SongResult, queue?: SongResult[], options?: PlaybackNavigationOptions) => void | Promise<void>;
     /**
      * playQueueItem: plays `song` within `queue`, which must be the store's playQueue array itself
      * (the queue controller then retries and skips a failure against the live queue), keeping
@@ -111,10 +115,28 @@ export const useFoliumHostActions = (actions: FoliumAppActions) => {
             seekToLyricTime: (lyricSeconds) => actionsRef.current.seekToLyricTime(lyricSeconds),
             next: () => actionsRef.current.next(),
             previous: () => actionsRef.current.previous(),
-            playSongRef: async (ref) => {
-                const song = resolveFoliumSongRef(ref);
-                if (!song) return false;
-                await actionsRef.current.playSong(song);
+            playSongRef: async (ref, options) => {
+                if (!options) {
+                    const song = resolveFoliumSongRef(ref);
+                    if (!song) return false;
+                    await actionsRef.current.playSong(song);
+                    return true;
+                }
+                const canStartWithQueue = () => {
+                    const state = usePlaybackStore.getState();
+                    const kind = resolveFoliumQueueKind(state);
+                    return kind !== 'stage' && !selectIsShowingTail(state)
+                        && readFoliumQueueVersion(state.playQueue, kind) === options.expectedVersion;
+                };
+                const index = options.refs.indexOf(ref);
+                if (index < 0 || !canStartWithQueue()) return false;
+                const queue: SongResult[] = [];
+                for (const item of options.refs) {
+                    const song = resolveFoliumSongRef(item);
+                    if (!song || isStagePlaybackSong(song)) return false;
+                    queue.push(song);
+                }
+                await actionsRef.current.playSong(queue[index], queue, { startAtSec: options.startAtSec, canStartWithQueue });
                 return true;
             },
             enqueueSongRef: (ref) => {

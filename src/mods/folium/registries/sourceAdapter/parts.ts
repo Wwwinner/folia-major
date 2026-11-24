@@ -146,7 +146,7 @@ export const deriveFoliumSourceCapabilities = (parts: FoliumSourceParts): Provid
     lyrics: Boolean(parts.lyrics),
     auth: Boolean(parts.auth),
     userLibrary: Boolean(parts.library),
-    playlists: has(parts.catalog, 'getPlaylistTracks'),
+    playlists: has(parts.catalog, 'getPlaylistTracks') || has(parts.catalog, 'getPlaylistAlbums'),
     albums: has(parts.catalog, 'getAlbumTracks'),
     artists: has(parts.catalog, 'getArtistDetail'),
     recommendations: Boolean(parts.recommendations),

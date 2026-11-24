@@ -74,6 +74,8 @@ export interface NavidromeGridViewCollectionDescriptor extends BaseGridViewColle
 export interface OnlineGridViewCollectionDescriptor extends BaseGridViewCollectionDescriptor {
     source: 'online';
     providerId: OnlineProviderId;
+    /** 这张 playlist 的条目是专辑（`ProviderCollection.playlistContents`），由 catalog 的 getPlaylistAlbums 读。 */
+    playlistContents?: ProviderCollection['playlistContents'];
     raw?: any;
 }
 

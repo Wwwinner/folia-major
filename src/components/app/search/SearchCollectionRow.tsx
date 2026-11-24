@@ -11,6 +11,7 @@ type SearchCollectionRowProps = {
     collection: SearchCollectionResult;
     index: number;
     style: React.CSSProperties;
+    hideTrackCount?: boolean;
     onOpenCollection: (collection: SearchCollectionResult) => void;
 };
 
@@ -20,7 +21,7 @@ const yearOf = (publishedAt?: number) => {
     return year > 1900 ? String(year) : null;
 };
 
-const SearchCollectionRow: React.FC<SearchCollectionRowProps> = ({ collection, index, style, onOpenCollection }) => {
+const SearchCollectionRow: React.FC<SearchCollectionRowProps> = ({ collection, index, style, hideTrackCount = false, onOpenCollection }) => {
     const { t, i18n } = useTranslation();
     const isAlbum = collection.type === 'album';
     const coverUrl = getSizedCoverUrl(collection.coverUrl, 140);
@@ -35,7 +36,7 @@ const SearchCollectionRow: React.FC<SearchCollectionRowProps> = ({ collection, i
             ? t('search.playCount', { n: compact.format(collection.playCount) })
             : null,
     ].filter((value): value is string => Boolean(value));
-    const trackCount = typeof collection.trackCount === 'number' && collection.trackCount > 0 ? collection.trackCount : null;
+    const trackCount = !hideTrackCount && typeof collection.trackCount === 'number' && collection.trackCount > 0 ? collection.trackCount : null;
 
     return (
         <div style={style}>

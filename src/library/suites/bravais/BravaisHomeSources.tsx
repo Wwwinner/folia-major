@@ -71,7 +71,7 @@ export const BravaisHomeOnline: React.FC<BravaisHomeSourceCommonProps & {
     account: LibraryAccountController;
 }> = ({ tab, online, list, account: accountController, homeActions, onOpenGridView, ...common }) => {
     const { t } = useTranslation();
-    const showList = online.accountView === 'authenticated';
+    const showList = list.showList;
     useLibraryHomeListRegistration({
         enabled: showList,
         getState: (): LibraryHomeListState => ({
@@ -87,7 +87,7 @@ export const BravaisHomeOnline: React.FC<BravaisHomeSourceCommonProps & {
         setSection: () => false,
         runAction: () => false,
     });
-    // 未登录 / 无账户 / 解析中：墙空着，缝里说原因（平台切换与登录在 B10 的账户位里）。
+    // 账户曲库仍需要账户；无账户音源可用的公开推荐沿用同一面墙。
     // fb3（用户实测）：未登录时不再显示「先搜几首喜欢的歌试试看」（grid / TUI 仍用 home.guestTitle），缝里只有
     // 「连接在线平台」入口；登录过期仍要说。
     const emptyMessage = online.accountView === 'guest'

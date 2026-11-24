@@ -70,7 +70,7 @@ export const useBravaisHomeChrome = ({
     noOnlineSources: boolean;
     /** 在线页签搜索的来源：当前在线 provider。 */
     providerId: string;
-    selectTab: (key: LibraryHomeTabKey) => boolean;
+    selectTab: (key: LibraryHomeTabKey, fromGroup?: boolean) => boolean;
     scanPercent: number;
     scanning: boolean;
     props: ChromeProps;
@@ -81,9 +81,9 @@ export const useBravaisHomeChrome = ({
     latest.current = { tab, tabs, groups, providerId, selectTab, props };
 
     // 扩展页签（模组的首页页面）交给宿主打开；原生的页走 selectTab（收起搜索框、通知宿主关掉开着的页面）。
-    const selectSeamTab = useCallback((key: string): boolean => {
+    const selectSeamTab = useCallback((key: string, fromGroup = false): boolean => {
         const extra = latest.current.props.extraTabs?.find(tab => tab.id === key);
-        if (!extra) return latest.current.selectTab(key as LibraryHomeTabKey);
+        if (!extra) return latest.current.selectTab(key as LibraryHomeTabKey, fromGroup);
         extra.select();
         return true;
     }, []);
@@ -94,7 +94,7 @@ export const useBravaisHomeChrome = ({
             selectSeamTab(key);
             return;
         }
-        if (group.target) selectSeamTab(group.target);
+        if (group.target) selectSeamTab(group.target, true);
     }, [selectSeamTab]);
     const onSelectOnlineSection = useCallback((key: string) => {
         selectSeamTab(key);

@@ -302,6 +302,10 @@ export const toHostCollection = (providerId: OnlineProviderId, collection: Foliu
     const creator = record(raw.creator);
     const aliases = textList(raw.aliases);
     const coverUrl = optionalText(raw.coverUrl);
+    const variants = record(raw.coverVariants);
+    const landscape = optionalText(variants?.landscape);
+    const portrait = optionalText(variants?.portrait);
+    const square = optionalText(variants?.square);
     const numbers = (['trackCount', 'albumCount', 'publishedAt', 'playCount', 'updatedAt', 'tracksUpdatedAt'] as const)
         .flatMap((field) => {
             const value = finite(raw[field]);
@@ -312,7 +316,9 @@ export const toHostCollection = (providerId: OnlineProviderId, collection: Foliu
         id: text(raw.id),
         name: text(raw.name),
         type: text(raw.type) || 'playlist',
+        ...(raw.type === 'playlist' && raw.playlistContents === 'albums' ? { playlistContents: 'albums' as const } : {}),
         ...(coverUrl ? { coverUrl } : {}),
+        ...(landscape || portrait || square ? { coverVariants: { landscape, portrait, square } } : {}),
         ...(typeof raw.description === 'string' ? { description: raw.description } : {}),
         ...Object.fromEntries(numbers),
         ...(typeof raw.isOwned === 'boolean' ? { isOwned: raw.isOwned } : {}),
@@ -338,9 +344,11 @@ export const toSourceCollection = (collection: ProviderCollection): FoliumSource
         type: collection.type,
         name: collection.name,
         ...(collection.coverUrl ? { coverUrl: collection.coverUrl } : {}),
+        ...(collection.coverVariants ? { coverVariants: Object.freeze({ ...collection.coverVariants }) } : {}),
         ...(collection.description !== undefined ? { description: collection.description } : {}),
         ...(collection.trackCount !== undefined ? { trackCount: collection.trackCount } : {}),
         ...(collection.albumCount !== undefined ? { albumCount: collection.albumCount } : {}),
+        ...(collection.playlistContents ? { playlistContents: collection.playlistContents } : {}),
         ...(collection.isOwned !== undefined ? { isOwned: collection.isOwned } : {}),
         ...(collection.creator ? { creator: toSourceUser(collection.creator) } : {}),
         ...(collection.artists ? { artists: sourceRefsOf(collection.artists) } : {}),

@@ -1,5 +1,5 @@
 {
-    "version": { "major": 2, "minor": 0 },
+    "version": { "major": 2, "minor": 1 },
     "foliumOneVersion": { "major": 1, "minor": 10 },
     "manifestVersions": [1, 2],
     "sourceCapabilities": {
@@ -53,10 +53,11 @@
                 "folium.playback.setVolume",
                 "folium.playback.setMuted",
                 "folium.playback.setLoopMode",
-                "folium.playback.playQueueItem"
+                "folium.playback.playQueueItem",
+                "folium.playback.playSongWithQueue"
             ]
         },
-        "playback.queue": { "guards": ["folium.playback.replaceQueue"] },
+        "playback.queue": { "guards": ["folium.playback.replaceQueue", "folium.playback.playSongWithQueue"] },
         "equalizer.control": { "guards": ["folium.equalizer.setMode", "folium.equalizer.applyCurve", "folium.equalizer.releaseCurve"] },
         "visualizer.renderQuality": { "guards": ["folium.visualizer.setRenderQuality"] },
         "visualizer.mode": { "guards": ["folium.visualizer.setMode"] },

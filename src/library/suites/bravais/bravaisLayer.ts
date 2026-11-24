@@ -1,3 +1,4 @@
+import type { ProviderCollection } from '../../../types/onlineMusic';
 import type { BravaisLayerEntries, BravaisLayerWall, BravaisSeamAlbum, BravaisSeamArtist, BravaisSeamArtistSongs, BravaisSeamCollection, BravaisSeamFilter } from './bravaisSeamModels';
 import type { BravaisHomeLayer, BravaisHomeSeam } from './bravaisHomeModels';
 import type { LibraryHomeSpecialKind } from '../../core/home/homeSpecialCards';
@@ -24,6 +25,7 @@ export type BravaisItem = {
     /** 副标题的悬停说明（换过来源的行）；没有就不给。 */
     subtitleHint?: string;
     coverUrl?: string;
+    coverVariants?: ProviderCollection['coverVariants'];
     /** 专辑墙（has-album-wall）上这首的封面画法；没有就照常画整张封面。 */
     coverArt?: BravaisCoverArt;
     /** 徽标文字：集合层是条目序号（01、02…），首页与歌手页是种类（歌单 / 专辑…），集合带曲目数（「歌单 · 124」）。 */

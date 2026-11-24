@@ -573,7 +573,7 @@ export function usePlaybackQueueController({
         const allowedSong = !options.isAutomixAdvance && hasBeforePlayHook()
             ? await runBeforePlayHook(requestedSong)
             : requestedSong;
-        if (!allowedSong || playSongCallIdRef.current !== playSongCallId || droppedMeanwhile()) {
+        if (!allowedSong || playSongCallIdRef.current !== playSongCallId || droppedMeanwhile() || options.canStartWithQueue?.() === false) {
             return;
         }
         // A music video a list showed as itself (its song was not known in time) plays as its song:
@@ -582,7 +582,7 @@ export function usePlaybackQueueController({
         // the blend's advance plays what it readied.
         const playedAs = options.isAutomixAdvance ? null : askPlayedSong(allowedSong);
         const playedSong = playedAs ? await playedAs : null;
-        if (playSongCallIdRef.current !== playSongCallId || droppedMeanwhile()) {
+        if (playSongCallIdRef.current !== playSongCallId || droppedMeanwhile() || (playedAs && options.canStartWithQueue?.() === false)) {
             return;
         }
         if (playedSong) {
@@ -683,6 +683,7 @@ export function usePlaybackQueueController({
             manualQueueStep: false,
             isAutomixAdvance: undefined,
             queueRewritten: undefined,
+            canStartWithQueue: undefined,
             startAtSec: undefined,
             autoplay: undefined,
             quietLoadedToast: undefined,
@@ -690,7 +691,7 @@ export function usePlaybackQueueController({
         // Where a local or Navidrome song starts, whether it plays and whether it shows its own toasts:
         // the HiFi bridge asks for them when it moves the song it was playing to the other engine.
         const startOptions: Pick<PlaybackNavigationOptions, 'startAtSec' | 'autoplay' | 'quietLoadedToast'> = {
-            startAtSec: options.startAtSec,
+            startAtSec: isSamePlaybackSong(song, requestedSong) ? options.startAtSec : undefined,
             autoplay: options.autoplay,
             quietLoadedToast: options.quietLoadedToast,
         };
@@ -775,7 +776,9 @@ export function usePlaybackQueueController({
                         const retryQueue = queue.length > 0 && (queueFollowsStore || rewritten) ? readLiveQueue() ?? [] : queue;
                         const retryFm = rewritten ? usePlaybackStore.getState().isFmMode : asFm();
                         if (onFmLanding && !rewritten && retryFm && isLatestPlaybackRequest() && playSongCallIdRef.current === playSongCallId) registerPersonalFmLanding(retryQueue, onFmLanding);
-                        void latestQueueActionsRef.current.playSong(song, retryQueue, retryFm, { ...deferredPlayOptions, unavailableSkipCount: 0 });
+                        void latestQueueActionsRef.current.playSong(song, retryQueue, retryFm, {
+                            ...deferredPlayOptions, startAtSec: startOptions.startAtSec, unavailableSkipCount: 0,
+                        });
                     },
                 } : said);
             }
@@ -947,7 +950,7 @@ export function usePlaybackQueueController({
                 // call, and pausing it here would race that play in the companion's queue. A song of
                 // another provider plays in another player: `beginExternalPlayback` stops the old one.
                 if (!isExternalRoute()) pauseWhatIsSounding(audioRef.current);
-                await beginExternalPlayback(song, options.startAtSec ?? 0);
+                await beginExternalPlayback(song, startOptions.startAtSec ?? 0);
             } else {
                 // Where the platform could not be reached the load asks again by itself while this play is
                 // wanted, and says so.
@@ -1247,8 +1250,8 @@ export function usePlaybackQueueController({
         return () => setLocalSearchCollectionsReader(null);
     }, [localLibraryCatalog, localPlaylists, localSongs, t]);
 
-    const handleSearchOverlaySubmit = useCallback(async (requestedSource?: SearchSource, requestedKind?: SearchKind) => {
-        const trimmedQuery = searchQuery.trim();
+    const handleSearchOverlaySubmit = useCallback(async (requestedSource?: SearchSource, requestedKind?: SearchKind, query?: string) => {
+        const trimmedQuery = (query ?? searchQuery).trim();
         if (!trimmedQuery) {
             return;
         }

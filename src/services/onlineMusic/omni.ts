@@ -350,11 +350,12 @@ const searchWith = (
     query: string,
     page: PageInput,
     context?: ProviderSearchContext,
-): Promise<OmniPage<UnifiedSong>> => (
-    context
+): Promise<OmniPage<UnifiedSong>> => {
+    if (search.supportsSongs === false) return Promise.resolve(emptyPage(page.offset));
+    return context
         ? search.searchSongs(query, page.limit, page.offset, context)
-        : search.searchSongs(query, page.limit, page.offset)
-);
+        : search.searchSongs(query, page.limit, page.offset);
+};
 
 // A request that goes straight to the provider, for a caller that hands in no runner.
 const runDirectly: OmniRequestRunner = work => work();
@@ -748,14 +749,14 @@ export const omni = {
         return searchWith(provider.search, query, page, context);
     },
 
-    // What the provider's search finds: songs wherever it searches, albums and playlists where it has
+    // What the provider's search finds: songs where supported; albums and playlists where it has
     // a search for them and also opens them. Empty for a provider that is not there or has no search.
     getProviderSearchKinds(providerId: OmniProviderId): OmniSearchKind[] {
         const provider = getOnlineMusicProvider(providerId);
         if (!provider || !providerSupports(provider, 'search') || !provider.search) return [];
         const search = provider.search;
         return [
-            'song' as const,
+            ...(search.supportsSongs !== false ? ['song' as const] : []),
             ...(search.searchAlbums && providerSupports(provider, 'albums') ? ['album' as const] : []),
             ...(search.searchPlaylists && providerSupports(provider, 'playlists') ? ['playlist' as const] : []),
         ];
@@ -1090,23 +1091,27 @@ export const omni = {
     }> {
         return withActiveProvider(async provider => {
             const recommendations = provider.recommendations;
-            // 三块各自成败：一块失败（例如日推被上游拒绝）只让那一块为空、结果标成 partial，不把 FM 与推荐歌单
-            // 一起拖下去；三块都失败才算这次首页推荐失败。作废（AbortError）不算某一块的失败，整次照常作废。
-            const [personalFm, dailySongs, recommendedCollections] = await Promise.allSettled([
-                recommendations?.getPersonalFm?.() ?? [],
-                recommendations?.getDailySongs?.() ?? [],
-                recommendations?.getRecommendedCollections?.(limit) ?? [],
-            ]);
-            const settled = [personalFm, dailySongs, recommendedCollections];
+            // 失败的一部分按空显示；所有实际提供的部分都失败时，才算整页失败。
+            // 作废（AbortError）不是某一块的失败，整次照常作废。
+            const reads = [
+                recommendations?.getPersonalFm?.(),
+                recommendations?.getDailySongs?.(),
+                recommendations?.getRecommendedCollections?.(limit),
+            ] as const;
+            const missing = Promise.resolve(undefined);
+            const settled = await Promise.allSettled([reads[0] ?? missing, reads[1] ?? missing, reads[2] ?? missing]);
+            const [personalFm, dailySongs, recommendedCollections] = settled;
             const failures = settled.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
             const aborted = failures.find(failure => (failure.reason as { name?: unknown } | null)?.name === 'AbortError');
             if (aborted) throw aborted.reason;
-            if (failures.length === settled.length) throw failures[0].reason;
+            if (failures.length > 0 && reads.every((read, index) => read === undefined || settled[index].status === 'rejected')) {
+                throw failures[0].reason;
+            }
             failures.forEach(failure => console.warn('[Omni] Home feed section failed', {
                 providerId: provider.id,
                 ...errorFields(failure.reason),
             }));
-            const valueOf = <T>(result: PromiseSettledResult<T[]>): T[] => (result.status === 'fulfilled' ? result.value : []);
+            const valueOf = <T>(result: PromiseSettledResult<T[] | undefined>): T[] => (result.status === 'fulfilled' ? result.value ?? [] : []);
             return {
                 personalFm: valueOf(personalFm),
                 dailySongs: valueOf(dailySongs),
@@ -1532,6 +1537,7 @@ export const omni = {
     },
 
     async getCollectionTracks(collection: OmniCollection, page: PageInput): Promise<OmniPage<UnifiedSong>> {
+        if (collection.type === 'playlist' && collection.playlistContents === 'albums') return emptyPage(page.offset);
         const provider = providerForCollection(collection);
         return runRequest(provider, 'collection', async () => {
             if (collection.type === 'album') {
@@ -1562,6 +1568,18 @@ export const omni = {
                 };
             }
             return await (provider.catalog?.getPlaylistTracks?.(collection.id, page.limit, page.offset, collection) ?? emptyPage(page.offset));
+        });
+    },
+
+    async getPlaylistAlbums(collection: OmniCollection, page: PageInput): Promise<OmniPage<OmniCollection>> {
+        const provider = providerForCollection(collection);
+        const read = provider.catalog?.getPlaylistAlbums?.bind(provider.catalog);
+        if (collection.type !== 'playlist' || collection.playlistContents !== 'albums' || !read) {
+            return unsupported(provider.id, 'playlist albums');
+        }
+        return runRequest(provider, 'collection', async () => {
+            const found = await read(collection.id, page.limit, page.offset, collection);
+            return { ...found, items: found.items.filter(item => item.type === 'album' && item.providerId === provider.id) };
         });
     },
 

@@ -1,0 +1,9 @@
+{
+    "sourceName": "Fanjiao",
+    "notConfigured": "Kredensial tanda tangan Fanjiao belum diatur. Atur FANJIAO_SIGNATURE_SECRET_FILE, lalu mulai ulang Folia.",
+    "notPlayable": "Episode ini belum bisa diputar.",
+    "requestFailed": "Permintaan gagal. Coba lagi nanti.",
+    "playbackFailed": "Pemutaran gagal. Coba lagi nanti.",
+    "unsupportedPlayback": "Lingkungan ini tidak mendukung cara pemutaran ini.",
+    "nothingToContinue": "Belum ada episode Fanjiao yang bisa dilanjutkan."
+}

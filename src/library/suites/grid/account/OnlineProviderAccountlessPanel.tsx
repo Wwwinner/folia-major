@@ -9,9 +9,7 @@ type OnlineProviderAccountlessPanelProps = {
     onSearch: () => void;
 };
 
-// Shown on the online tabs when the active provider has no account (a Folium mod source): it only
-// searches and plays, so instead of a library this points the user at the search box. Playlists,
-// albums and radio for mod sources are left to the full provider interface in Folium v2.
+// 无账户音源不能显示账户曲库；可以加载的公开推荐不经过这个提示。
 const OnlineProviderAccountlessPanel = ({ providerLabel, isDaylight, onSearch }: OnlineProviderAccountlessPanelProps) => {
     const { t } = useTranslation();
     return (

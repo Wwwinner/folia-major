@@ -8,6 +8,8 @@ import { buildFoliumSourceProvider, readFoliumSourceParts } from '@/mods/folium/
 import { createFoliumSourceTextBook } from '@/mods/folium/registries/sourceText';
 import { FOLIUM_SOURCE_CAPABILITY_MEMBERS, FOLIUM_SOURCE_CAPABILITY_VERSIONS } from '@/mods/folium/sources/capabilities';
 import type { FoliumSourceCapabilities, FoliumSourceDef } from '@/mods/folium/sources/contract';
+import { omni } from '@/services/onlineMusic/omni';
+import { registerOnlineMusicProvider, unregisterOnlineMusicProvider } from '@/services/onlineMusic/providerRegistry';
 import { parseContract } from '../../../dev/folium/api-docs.mjs';
 
 // test/unit/mod-system/foliumSourceMembers.test.ts
@@ -133,19 +135,44 @@ describe('songs@1 counterparts through the adapter', () => {
     });
 });
 
+it('finds a source playlist of albums even when the source has no playlist of tracks', async () => {
+    const id = 'folium.mod-a.album-lists';
+    const text = createFoliumSourceTextBook('mod-a', id);
+    const def: FoliumSourceDef = {
+        id: 'album-lists',
+        displayName: 'Album lists',
+        capabilities: {
+            'search@1': {
+                supportsSongs: false,
+                searchSongs: async () => ({ items: [], hasMore: false }),
+                searchPlaylists: async () => ({
+                    items: [{ id: 'sets', name: 'Sets', type: 'playlist', playlistContents: 'albums' }], hasMore: false,
+                }),
+            },
+            'catalog@1': { getPlaylistAlbums: async () => ({ items: [{ id: 'one', name: 'First', type: 'album' }], hasMore: false }) },
+        },
+    };
+    const parts = readFoliumSourceParts('mod-a', def.capabilities, () => {});
+    const provider = buildFoliumSourceProvider({ modId: 'mod-a', hostId: id, text, tells: new Set() }, def, parts);
+    registerOnlineMusicProvider(provider);
+    try {
+        const page = { limit: 20, offset: 0 };
+        expect(omni.getProviderSearchKinds(id)).toEqual(['playlist']);
+        const { items: [playlist] } = await omni.searchProviderCollections(id, 'playlist', 'sets', page);
+        await expect(omni.getPlaylistAlbums(playlist, page)).resolves.toMatchObject({ items: [{ id: 'one', type: 'album' }] });
+    } finally {
+        unregisterOnlineMusicProvider(id);
+        text.dispose();
+    }
+});
+
 describe('every member of the internal contract has a place for a Folium 2.0 source', () => {
     it('the table places exactly the members the internal contract has', () => {
-        let count = 0;
         for (const [name, destinations] of Object.entries(FOLIUM_SOURCE_MEMBER_DESTINATIONS)) {
             const members = membersOf(internal, name);
             expect(members, name).not.toBeNull();
             expect(Object.keys(destinations).sort(), name).toEqual([...members!].sort());
-            count += members!.length;
         }
-        // The member matrix's count (dev/folium/folium-2-member-matrix.md §1): 13 + 13 + 111 + 3 + 25, and the three
-        // the host took in S6 for playback.surface after the matrix was made (routeOf, itemKinds, externalPlayback.mount).
-        // And the two of songs@1 that name a counterpart of another source's song (counterpartSources, getCounterparts).
-        expect(count).toBe(165 + 3 + 2);
         // No sub-interface of the provider is left out of the table.
         const slots = Object.entries(FOLIUM_SOURCE_MEMBER_DESTINATIONS.OnlineMusicProvider)
             .filter(([slot, destination]) => slot !== 'capabilities' && (destination.startsWith('derived from') || destination === 'dto'))

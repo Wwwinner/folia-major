@@ -21,7 +21,7 @@ export const PLACE_KINDS = {
 export type PlaceKind = keyof typeof PLACE_KINDS;
 
 export interface PlatformNamePlace {
-    n: Partial<Record<'netease' | 'qq' | 'kugou' | 'bodian' | 'ytm' | 'spotify' | 'qishui' | 'fnmusic' | 'appleMusic' | 'lxmusic', number>>;
+    n: Partial<Record<'netease' | 'qq' | 'kugou' | 'bodian' | 'ytm' | 'spotify' | 'qishui' | 'fnmusic' | 'appleMusic' | 'lxmusic' | 'fanjiao', number>>;
     // The kind of the file's lines of code; its comment lines are counted as comments.
     kind: PlaceKind;
     // What the lines are, where the kind alone does not say it.
@@ -35,7 +35,7 @@ export const PLATFORM_NAME_PLACES: Record<string, PlatformNamePlace> = {
     'api/qq.js': { n: { qq: 10 }, kind: 'main', why: 'the built copy of api-ts/qq.ts' },
     'electron/aiCredentialStore.cjs': { n: { qq: 1, kugou: 1, bodian: 1 }, kind: 'doc' },
     'electron/linuxPasswordStore.cjs': { n: { qq: 1, kugou: 1 }, kind: 'main' },
-    'electron/modSystem/builtinSources.cjs': { n: { netease: 3, qq: 4, kugou: 3, bodian: 3, ytm: 5, spotify: 5, qishui: 3, appleMusic: 1, fnmusic: 4, lxmusic: 3 }, kind: 'list', why: 'Folium 2.0 (plan §5.1): the trusted table of the built-in sources, the one place the loader names them, with the old keys, partitions and folders each sign-in lives in (2026-11-14, S2); fnmusic +1 for its old media scheme, which saved songs still name (S5, 2026-11-20); spotify +1 for the media cache folder its encrypted audio files are in (step 7, 2026-11-20); lxmusic: its row, with the in-memory partition of its sandbox window (2026-11-21)' },
+    'electron/modSystem/builtinSources.cjs': { n: { netease: 3, qq: 4, kugou: 3, bodian: 3, ytm: 5, spotify: 5, qishui: 3, appleMusic: 1, fnmusic: 4, lxmusic: 3, fanjiao: 2 }, kind: 'list', why: 'Folium 2.0 (plan §5.1): the trusted table of the built-in sources, the one place the loader names them, with the old keys, partitions and folders each sign-in lives in (2026-11-14, S2); fnmusic +1 for its old media scheme, which saved songs still name (S5, 2026-11-20); spotify +1 for the media cache folder its encrypted audio files are in (step 7, 2026-11-20); lxmusic: its row, with the in-memory partition of its sandbox window (2026-11-21)' },
     'electron/modSystem/nativeFiles.cjs': { n: { appleMusic: 2 }, kind: 'list', why: 'Folium 2.0 (plan §5.5): the native files the app ships for a built-in source, by the names the trusted table lists; the two lines are the file names of the Apple Music companion the app builds and packages (2026-11-20, step 7)' },
     'electron/loginBackendIpc.cjs': { n: { netease: 1 }, kind: 'main', why: 'a comment on the IPC channels the embedded backends had before they moved into their source mods (2026-11-20), and the table that finds a backend by its platform id' },
     'electron/networkRecorder.cjs': { n: { netease: 4, qq: 3 }, kind: 'main', why: 'the hosts by which a request is filed under the backend that sent it' },

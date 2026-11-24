@@ -42,7 +42,7 @@ export interface FoliumHostActions {
     next: () => void;
     previous: () => void;
     /** Resolves a song ref and plays it; false when the ref is unknown. */
-    playSongRef: (ref: string) => Promise<boolean>;
+    playSongRef: (ref: string, options?: { refs: readonly string[]; expectedVersion: string; startAtSec?: number }) => Promise<boolean>;
     enqueueSongRef: (ref: string) => boolean;
     /** False when the queue cannot be shuffled right now. */
     shuffleQueue: () => boolean;
@@ -183,6 +183,20 @@ export const createFoliumPlaybackService = (mod: ModRuntimeInfo, context: Folium
         next: () => control().next(),
         previous: () => control().previous(),
         playSong: async (song: FoliumSong) => control().playSongRef(requireRef(song)),
+        ...(mod.folium === 2 ? {
+            playSongWithQueue: async (song: FoliumSong, options: unknown) => {
+                const actions = control();
+                requirePermission(mod, PLAYBACK_QUEUE);
+                const ref = requireRef(song);
+                if (typeof options !== 'object' || options === null) throw invalidArguments('playSongWithQueue requires options');
+                const plan = queueReplaceRefsOf('queue' in options ? options.queue : undefined, options);
+                const startAtSec = 'startAtSec' in options ? options.startAtSec : undefined;
+                if (startAtSec !== undefined && (typeof startAtSec !== 'number' || !Number.isFinite(startAtSec) || startAtSec < 0)) {
+                    throw invalidArguments('startAtSec must be a finite non-negative number');
+                }
+                return actions.playSongRef(ref, { ...plan, startAtSec });
+            },
+        } : {}),
         enqueue: (song: FoliumSong) => control().enqueueSongRef(requireRef(song)),
         shuffleQueue: () => control().shuffleQueue(),
         toggleLike: () => control().toggleLike(),
@@ -215,7 +229,7 @@ export const createFoliumPlaybackService = (mod: ModRuntimeInfo, context: Folium
             const { refs, expectedVersion } = queueReplaceRefsOf(songs, options);
             return actions.replaceQueue(mod.id, refs, expectedVersion);
         },
-    });
+    }) as FoliumPlaybackService;
 };
 
 /*

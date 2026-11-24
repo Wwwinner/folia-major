@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { LibraryHomeFeedOwner, LibraryHomeResources } from '../core/home/homeModel.contract';
+import type { LibraryHomeResources } from '../core/home/homeModel.contract';
 import type { HomeSurfaceProps } from '../../components/app/home/homeSurfaceTypes';
 import { createFavoriteAlbumsFeed, createRadioFeed } from '../core/home/online/onlineHomeFeeds.service';
 import { onlineHomeFeedDeps } from '../core/home/online/onlineHomeFeedDeps.service';
@@ -74,7 +74,7 @@ export const useLibraryHomeResources = (
     // 账号上的推荐偏好存过：电台卡片读过的就重读（每日推荐那张的封面跟着换），正在读的等这一轮结束。
     useEffect(() => {
         const { radioFeed } = resources;
-        let pendingOwner: LibraryHomeFeedOwner | null = null;
+        let pendingOwner: ReturnType<typeof radioFeed.getSnapshot>['owner'] = null;
         const stopWatchingFeed = radioFeed.subscribe(() => {
             if (!pendingOwner) return;
             const { owner, status } = radioFeed.getSnapshot();

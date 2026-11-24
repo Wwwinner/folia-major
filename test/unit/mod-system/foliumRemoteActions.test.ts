@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FoliumRemoteActionDef, FoliumRemoteActionsContext } from '../../../src/mods/folium/contract';
-import { FOLIUM_VERSION } from '../../../src/mods/folium/contract';
 import { registerRemoteActions, remoteActionsRegistry, resolveRemoteActions, subscribeRemoteActions } from '../../../src/mods/folium/registries/remoteActions';
 import { clearFoliumIssues, getFoliumIssues } from '../../../src/mods/runtime/status';
 
@@ -23,12 +22,10 @@ afterEach(() => {
 });
 
 describe('experimental remote.actions registry', () => {
-    it('recognizes only the new opt-in without changing the stable Folium version', () => {
+    it('accepts only the registered remote.actions opt-in', () => {
         const manifest = { id: 'sample', name: 'Sample', version: '1.0.0', folium: 1, client: 'client.mjs', experimental: ['remote.actions'] };
         expect(validateManifest(manifest).ok).toBe(true);
         expect(validateManifest({ ...manifest, experimental: ['remote.ui'] }).ok).toBe(false);
-        // Folium 2.0 (S3) raised the version itself; the opt-in still changes nothing of it.
-        expect(FOLIUM_VERSION).toEqual({ major: 2, minor: 0 });
     });
 
     it('namespaces actions by mod and group, keeping group order and complete locale maps', () => {

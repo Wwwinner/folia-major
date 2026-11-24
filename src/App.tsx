@@ -2099,7 +2099,7 @@ export default function App() {
         seekToLyricTime: handleMonetLyricLineSeek,
         next: () => { void handleNextTrack(); },
         previous: handlePrevTrack,
-        playSong: (song) => playSong(song),
+        playSong: (song, queue, options) => playSong(song, queue, false, options),
         playQueueSong: (song, queue, isFm) => playSong(song, queue, isFm),
         enqueue: addOnlineSongToQueue,
         navigateToPlayer,

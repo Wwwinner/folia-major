@@ -70,6 +70,18 @@ describe('online home cards', () => {
         expect(cards[2].raw).toMatchObject({ id: 'r1', description: 'Curator', summary: 'Curator' });
     });
 
+    it('opens album recommendations and album playlists with their own types and no radio description', () => {
+        const album = collection({ id: 'drama', type: 'album' });
+        const playlist = collection({ id: 'featured', type: 'playlist', playlistContents: 'albums' });
+        const cards = buildOnlineRadioCards({ hasPersonalFm: false, supportsDailySongs: false, dailyCoverUrl: '', dailyCount: 0,
+            recommended: [playlist, album] }, { t });
+        expect(cards.map(onlineCardCollection)).toMatchObject([
+            { id: 'featured', providerId: 'p', type: 'playlist', playlistContents: 'albums' },
+            { id: 'drama', providerId: 'p', type: 'album' },
+        ]);
+        expect(cards.map(card => [card.description, card.trackCount])).toEqual([['', undefined], ['', undefined]]);
+    });
+
     it('leaves the FM card out when the provider handed over no FM song', () => {
         const cards = buildOnlineRadioCards({ hasPersonalFm: false, dailyCoverUrl: '', dailyCount: 1, recommended: [] }, { t });
         expect(cards.map(card => card.id)).toEqual(['daily_recommendations']);
